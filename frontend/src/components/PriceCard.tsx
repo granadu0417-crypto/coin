@@ -81,7 +81,11 @@ export default function PriceCard({ price, history }: PriceCardProps) {
 
       <div className="mt-4 pt-4 border-t border-slate-700">
         <p className="text-xs text-slate-500">
-          Last updated: {new Date(price.timestamp).toLocaleString()}
+          Last updated: {new Date(
+            typeof price.timestamp === 'number'
+              ? price.timestamp * 1000
+              : price.timestamp
+          ).toLocaleString()}
         </p>
       </div>
     </div>

@@ -6,6 +6,13 @@ interface PredictionsListProps {
 }
 
 const PERSONA_NAMES: Record<string, string> = {
+  // New analyst types
+  technical: '📊 Technical Analyst',
+  momentum: '🚀 Momentum Trader',
+  volatility: '📉 Volatility Analyst',
+  sentiment: '💭 Sentiment Analyst',
+  trend: '📈 Trend Follower',
+  // Legacy support
   value_investor: '💼 Value Investor',
   technical_analyst: '📊 Technical Analyst',
   momentum_trader: '🚀 Momentum Trader',
@@ -55,10 +62,14 @@ export default function PredictionsList({ predictions }: PredictionsListProps) {
                 </div>
                 <div>
                   <p className="font-semibold">
-                    {PERSONA_NAMES[prediction.persona] || prediction.persona}
+                    {PERSONA_NAMES[prediction.analyst || prediction.persona || 'unknown'] || prediction.analyst || prediction.persona || 'Unknown'}
                   </p>
                   <p className="text-xs text-slate-400">
-                    {new Date(prediction.created_at).toLocaleString()}
+                    {prediction.created_at ? new Date(
+                      typeof prediction.created_at === 'number'
+                        ? prediction.created_at * 1000
+                        : prediction.created_at
+                    ).toLocaleString() : 'Unknown date'}
                   </p>
                 </div>
               </div>

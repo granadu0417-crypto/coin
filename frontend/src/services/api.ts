@@ -1,7 +1,8 @@
 import axios from 'axios';
 import type { Price, Prediction, Consensus, HealthStatus } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Cloudflare Workers API URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -12,7 +13,7 @@ const api = axios.create({
 
 export const healthApi = {
   check: async (): Promise<HealthStatus> => {
-    const response = await api.get('/api/v1/health');
+    const response = await api.get('/health');
     return response.data;
   },
 };
@@ -21,42 +22,42 @@ export const pricesApi = {
   getHistory: async (
     symbol: string,
     exchange: string = 'binance',
-    hours: number = 24
+    limit: number = 100
   ): Promise<Price[]> => {
-    const response = await api.get(`/api/v1/prices/${symbol}`, {
-      params: { exchange, hours },
+    const response = await api.get(`/api/prices/${symbol}/history`, {
+      params: { exchange, limit },
     });
-    return response.data;
+    return response.data.prices || [];
   },
 
   getLatest: async (
     symbol: string,
     exchange: string = 'binance'
   ): Promise<Price> => {
-    const response = await api.get(`/api/v1/prices/${symbol}/latest`, {
+    const response = await api.get(`/api/prices/${symbol}`, {
       params: { exchange },
     });
-    return response.data;
+    return response.data.exchanges?.[exchange] || response.data;
   },
 };
 
 export const predictionsApi = {
   getAll: async (
     symbol: string,
-    persona?: string,
+    analyst?: string,
     timeframe?: string
   ): Promise<Prediction[]> => {
-    const response = await api.get(`/api/v1/predictions/${symbol}`, {
-      params: { persona, timeframe, active_only: true },
+    const response = await api.get(`/api/predictions/${symbol}`, {
+      params: { analyst, timeframe },
     });
-    return response.data;
+    return response.data.predictions || [];
   },
 
   getConsensus: async (
     symbol: string,
     timeframe: string = '24h'
   ): Promise<Consensus> => {
-    const response = await api.get(`/api/v1/predictions/${symbol}/consensus`, {
+    const response = await api.get(`/api/predictions/${symbol}/consensus`, {
       params: { timeframe },
     });
     return response.data;
