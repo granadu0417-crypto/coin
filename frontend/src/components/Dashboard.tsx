@@ -24,7 +24,7 @@ export default function Dashboard() {
 
   const { data: priceHistory } = useQuery({
     queryKey: ['priceHistory', selectedCoin],
-    queryFn: () => pricesApi.getHistory(selectedCoin, 'binance', 24),
+    queryFn: () => pricesApi.getHistory(selectedCoin, 'upbit', 24),
     refetchInterval: 60000, // Refresh every minute
   });
 

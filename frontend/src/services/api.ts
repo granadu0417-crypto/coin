@@ -32,12 +32,11 @@ export const pricesApi = {
 
   getLatest: async (
     symbol: string,
-    exchange: string = 'binance'
+    exchange: string = 'upbit'
   ): Promise<Price> => {
-    const response = await api.get(`/api/prices/${symbol}`, {
-      params: { exchange },
-    });
-    return response.data.exchanges?.[exchange] || response.data;
+    const response = await api.get(`/api/prices/${symbol}`);
+    // Return upbit data by default, fallback to bithumb if upbit is null
+    return response.data.exchanges?.upbit || response.data.exchanges?.bithumb || response.data;
   },
 };
 

@@ -121,6 +121,102 @@ app.get('/api/news', async (c) => {
   }
 });
 
+// Get predictions (using technical analysis)
+app.get('/api/predictions/:symbol', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+
+  try {
+    // Use Upbit since Binance is blocked
+    const prices = await upbitService.getCandles(symbol, 1, 100);
+    const ticker = await upbitService.getTicker(symbol);
+
+    if (!ticker) {
+      return c.json({ error: 'Symbol not found' }, 404);
+    }
+
+    // Perform analysis
+    const analysis = technicalAnalyst.analyze({
+      symbol,
+      prices,
+      currentPrice: ticker.price,
+      volume24h: ticker.volume,
+      priceChange24h: ticker.change24h,
+    });
+
+    // Convert analysis to prediction format
+    const prediction = {
+      id: 1,
+      analyst: 'technical' as const,
+      symbol,
+      direction: analysis.direction,
+      confidence: analysis.confidence,
+      timeframe: '24h',
+      reasoning: analysis.reasoning,
+      created_at: Math.floor(Date.now() / 1000),
+      is_active: true,
+    };
+
+    return c.json({
+      predictions: [prediction],
+      count: 1,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get consensus (aggregated predictions)
+app.get('/api/predictions/:symbol/consensus', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+
+  try {
+    // Use Upbit since Binance is blocked
+    const prices = await upbitService.getCandles(symbol, 1, 100);
+    const ticker = await upbitService.getTicker(symbol);
+
+    if (!ticker) {
+      return c.json({ error: 'Symbol not found' }, 404);
+    }
+
+    // Perform analysis
+    const analysis = technicalAnalyst.analyze({
+      symbol,
+      prices,
+      currentPrice: ticker.price,
+      volume24h: ticker.volume,
+      priceChange24h: ticker.change24h,
+    });
+
+    // Convert to prediction format
+    const prediction = {
+      id: 1,
+      analyst: 'technical' as const,
+      symbol,
+      direction: analysis.direction,
+      confidence: analysis.confidence,
+      timeframe: '24h',
+      reasoning: analysis.reasoning,
+      created_at: Math.floor(Date.now() / 1000),
+      is_active: true,
+    };
+
+    // Create consensus (single analyst for now)
+    const consensus = {
+      symbol,
+      consensus_direction: analysis.direction,
+      consensus_confidence: analysis.confidence,
+      bullish_count: analysis.direction === 'bullish' ? 1 : 0,
+      bearish_count: analysis.direction === 'bearish' ? 1 : 0,
+      neutral_count: analysis.direction === 'neutral' ? 1 : 0,
+      predictions: [prediction],
+    };
+
+    return c.json(consensus);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 // Scheduled cron trigger handler
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
