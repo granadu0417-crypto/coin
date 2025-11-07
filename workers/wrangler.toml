@@ -1,0 +1,30 @@
+name = "crypto-analysis-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-15"
+
+# D1 Database (SQLite)
+# Run: wrangler d1 create crypto-analysis
+# Then replace database_id with the generated ID
+[[d1_databases]]
+binding = "DB"
+database_name = "crypto-analysis"
+database_id = "placeholder-run-wrangler-d1-create"
+
+# KV Namespace for caching
+# Run: wrangler kv:namespace create CACHE
+# Then replace id with the generated ID
+[[kv_namespaces]]
+binding = "CACHE"
+id = "placeholder-run-wrangler-kv-create"
+
+# Scheduled triggers (Cron)
+[triggers]
+crons = [
+  "*/1 * * * *",   # Update prices every 1 minute
+  "*/5 * * * *",   # Fetch news every 5 minutes
+  "*/30 * * * *"   # Run analysis every 30 minutes
+]
+
+# CORS configuration
+[vars]
+ALLOWED_ORIGINS = "http://localhost:5173,https://your-project.pages.dev"
