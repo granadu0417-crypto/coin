@@ -21,7 +21,7 @@ export type AnalystType =
   | 'trend';
 
 // Legacy support
-export type Persona = AnalystType |
+export type Persona = AnalystType
   | 'value_investor'
   | 'technical_analyst'
   | 'momentum_trader'
