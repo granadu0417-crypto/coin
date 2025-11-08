@@ -35,7 +35,23 @@ export const pricesApi = {
   ): Promise<Price> => {
     const response = await api.get(`/api/prices/${symbol}`);
     // Return upbit data by default, fallback to bithumb if upbit is null
-    return response.data.exchanges?.upbit || response.data.exchanges?.bithumb || response.data;
+    const exchangeData = response.data.exchanges?.upbit || response.data.exchanges?.bithumb;
+
+    if (!exchangeData) {
+      throw new Error('No exchange data available');
+    }
+
+    // Convert exchange data format to Price format
+    return {
+      symbol: exchangeData.symbol,
+      exchange: response.data.exchanges?.upbit ? 'upbit' : 'bithumb',
+      timestamp: response.data.timestamp,
+      open: exchangeData.price, // Use current price as open (we don't have historical open)
+      high: exchangeData.high24h,
+      low: exchangeData.low24h,
+      close: exchangeData.price,
+      volume: exchangeData.volume,
+    };
   },
 };
 
