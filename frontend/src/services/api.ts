@@ -31,8 +31,7 @@ export const pricesApi = {
   },
 
   getLatest: async (
-    symbol: string,
-    exchange: string = 'upbit'
+    symbol: string
   ): Promise<Price> => {
     const response = await api.get(`/api/prices/${symbol}`);
     // Return upbit data by default, fallback to bithumb if upbit is null
