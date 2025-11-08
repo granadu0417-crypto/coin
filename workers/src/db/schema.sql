@@ -61,3 +61,40 @@ CREATE TABLE IF NOT EXISTS sentiment_aggregates (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sentiment_symbol_time ON sentiment_aggregates(symbol, timestamp DESC);
+
+-- Influencer mentions table
+CREATE TABLE IF NOT EXISTS influencer_mentions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  influencer_name TEXT NOT NULL,
+  platform TEXT NOT NULL, -- 'twitter', 'reddit', 'telegram', 'news'
+  content TEXT NOT NULL,
+  url TEXT,
+  symbols TEXT, -- Comma-separated, e.g., 'BTC,ETH'
+  sentiment_score REAL CHECK(sentiment_score >= -1 AND sentiment_score <= 1),
+  impact_level TEXT CHECK(impact_level IN ('high', 'medium', 'low')),
+  published_at INTEGER NOT NULL,
+  created_at INTEGER DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_influencer_name ON influencer_mentions(influencer_name, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_influencer_platform ON influencer_mentions(platform);
+CREATE INDEX IF NOT EXISTS idx_influencer_symbols ON influencer_mentions(symbols);
+
+-- Price events table (tracks significant price changes correlated with influencer mentions)
+CREATE TABLE IF NOT EXISTS price_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol TEXT NOT NULL,
+  exchange TEXT NOT NULL,
+  event_type TEXT NOT NULL, -- 'spike', 'drop', 'volatility'
+  price_before REAL NOT NULL,
+  price_after REAL NOT NULL,
+  change_percent REAL NOT NULL,
+  volume_change REAL,
+  mention_id INTEGER, -- Links to influencer_mentions if correlated
+  event_time INTEGER NOT NULL,
+  created_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (mention_id) REFERENCES influencer_mentions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_events_symbol ON price_events(symbol, event_time DESC);
+CREATE INDEX IF NOT EXISTS idx_price_events_mention ON price_events(mention_id);

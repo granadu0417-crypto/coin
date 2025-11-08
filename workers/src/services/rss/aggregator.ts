@@ -1,5 +1,9 @@
 import type { RSSFeedItem, NewsArticle } from '../../types';
 import { sentimentAnalyzer } from '../analysis/sentiment';
+import {
+  detectInfluencerMention,
+  type InfluencerMention,
+} from '../influencers/detector';
 
 /**
  * RSS Feed sources for crypto news
@@ -143,6 +147,44 @@ export class RSSAggregator {
     const cutoffTime = Date.now() / 1000 - hours * 3600;
 
     return allNews.filter((news) => news.published_at >= cutoffTime);
+  }
+
+  /**
+   * Get influencer mentions from recent news
+   * 최근 뉴스에서 유명인 발언 추출
+   */
+  async getInfluencerMentions(hours: number = 24): Promise<InfluencerMention[]> {
+    const recentNews = await this.getRecentNews(hours);
+    const mentions: InfluencerMention[] = [];
+
+    for (const article of recentNews) {
+      const mention = detectInfluencerMention(article);
+      if (mention) {
+        mentions.push(mention);
+      }
+    }
+
+    // Sort by impact level and published date
+    mentions.sort((a, b) => {
+      // High impact first
+      if (a.impact_level !== b.impact_level) {
+        const impactOrder = { high: 0, medium: 1, low: 2 };
+        return impactOrder[a.impact_level] - impactOrder[b.impact_level];
+      }
+      // Then by date (newest first)
+      return b.published_at - a.published_at;
+    });
+
+    return mentions;
+  }
+
+  /**
+   * Get high-impact influencer mentions only
+   * 높은 영향력 유명인 발언만 가져오기
+   */
+  async getHighImpactMentions(hours: number = 24): Promise<InfluencerMention[]> {
+    const allMentions = await this.getInfluencerMentions(hours);
+    return allMentions.filter((mention) => mention.impact_level === 'high');
   }
 }
 

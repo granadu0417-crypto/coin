@@ -121,6 +121,50 @@ app.get('/api/news', async (c) => {
   }
 });
 
+// Get influencer mentions
+app.get('/api/influencer-mentions', async (c) => {
+  const hours = parseInt(c.req.query('hours') || '24');
+  const impactOnly = c.req.query('impact') === 'high';
+
+  try {
+    const mentions = impactOnly
+      ? await rssAggregator.getHighImpactMentions(hours)
+      : await rssAggregator.getInfluencerMentions(hours);
+
+    return c.json({
+      mentions,
+      count: mentions.length,
+      hours,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get influencer mentions by symbol
+app.get('/api/influencer-mentions/:symbol', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+  const hours = parseInt(c.req.query('hours') || '24');
+
+  try {
+    const allMentions = await rssAggregator.getInfluencerMentions(hours);
+
+    // Filter by symbol
+    const symbolMentions = allMentions.filter((mention) =>
+      mention.symbols.includes(symbol)
+    );
+
+    return c.json({
+      symbol,
+      mentions: symbolMentions,
+      count: symbolMentions.length,
+      hours,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 // Get predictions (using technical analysis)
 app.get('/api/predictions/:symbol', async (c) => {
   const symbol = c.req.param('symbol').toUpperCase();
