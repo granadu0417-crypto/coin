@@ -46,10 +46,10 @@ export default function Dashboard() {
       <header className="bg-slate-800 border-b border-slate-700 p-4">
         <div className="container mx-auto">
           <h1 className="text-2xl font-bold text-blue-400">
-            🚀 Crypto Analysis Platform
+            🚀 암호화폐 분석 플랫폼
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            AI-Powered Multi-Persona Analysis
+            AI 기반 다중 전문가 분석
           </p>
         </div>
       </header>
@@ -100,10 +100,10 @@ export default function Dashboard() {
         {(!predictions || predictions.length === 0) && (
           <div className="bg-slate-800 rounded-lg p-8 text-center">
             <p className="text-slate-400">
-              ⏳ AI predictions are being generated...
+              ⏳ AI 예측 분석 중...
             </p>
             <p className="text-sm text-slate-500 mt-2">
-              This process runs every 4 hours. Check back soon!
+              분석은 4시간마다 실행됩니다. 잠시 후 확인해주세요!
             </p>
           </div>
         )}

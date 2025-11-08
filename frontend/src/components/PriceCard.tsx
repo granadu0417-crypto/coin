@@ -20,13 +20,13 @@ export default function PriceCard({ price, history }: PriceCardProps) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-3xl font-bold">
-            ${price.close.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
+            ₩{price.close.toLocaleString('ko-KR', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
             })}
           </h2>
           <p className="text-slate-400 text-sm mt-1">
-            {price.symbol} / USDT
+            {price.symbol} / KRW
           </p>
         </div>
         <div
@@ -50,42 +50,42 @@ export default function PriceCard({ price, history }: PriceCardProps) {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
-          <p className="text-slate-400 text-sm">24h High</p>
+          <p className="text-slate-400 text-sm">24시간 최고가</p>
           <p className="text-lg font-semibold">
-            ${price.high.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
+            ₩{price.high.toLocaleString('ko-KR', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
             })}
           </p>
         </div>
         <div>
-          <p className="text-slate-400 text-sm">24h Low</p>
+          <p className="text-slate-400 text-sm">24시간 최저가</p>
           <p className="text-lg font-semibold">
-            ${price.low.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
+            ₩{price.low.toLocaleString('ko-KR', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
             })}
           </p>
         </div>
         <div>
-          <p className="text-slate-400 text-sm">Volume</p>
+          <p className="text-slate-400 text-sm">거래량</p>
           <p className="text-lg font-semibold">
-            {(price.volume / 1000000).toFixed(2)}M
+            {price.volume.toFixed(2)} {price.symbol}
           </p>
         </div>
         <div>
-          <p className="text-slate-400 text-sm">Exchange</p>
+          <p className="text-slate-400 text-sm">거래소</p>
           <p className="text-lg font-semibold capitalize">{price.exchange}</p>
         </div>
       </div>
 
       <div className="mt-4 pt-4 border-t border-slate-700">
         <p className="text-xs text-slate-500">
-          Last updated: {new Date(
+          마지막 업데이트: {new Date(
             typeof price.timestamp === 'number'
               ? price.timestamp * 1000
               : price.timestamp
-          ).toLocaleString()}
+          ).toLocaleString('ko-KR')}
         </p>
       </div>
     </div>

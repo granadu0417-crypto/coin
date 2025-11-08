@@ -7,19 +7,19 @@ interface PredictionsListProps {
 
 const PERSONA_NAMES: Record<string, string> = {
   // New analyst types
-  technical: '📊 Technical Analyst',
-  momentum: '🚀 Momentum Trader',
-  volatility: '📉 Volatility Analyst',
-  sentiment: '💭 Sentiment Analyst',
-  trend: '📈 Trend Follower',
+  technical: '📊 기술적 분석가',
+  momentum: '🚀 모멘텀 트레이더',
+  volatility: '📉 변동성 분석가',
+  sentiment: '💭 심리 분석가',
+  trend: '📈 추세 추종자',
   // Legacy support
-  value_investor: '💼 Value Investor',
-  technical_analyst: '📊 Technical Analyst',
-  momentum_trader: '🚀 Momentum Trader',
-  contrarian: '🔄 Contrarian',
-  macro_economist: '🌍 Macro Economist',
-  quant_analyst: '🔢 Quant Analyst',
-  risk_manager: '🛡️ Risk Manager',
+  value_investor: '💼 가치 투자자',
+  technical_analyst: '📊 기술적 분석가',
+  momentum_trader: '🚀 모멘텀 트레이더',
+  contrarian: '🔄 역발상 투자자',
+  macro_economist: '🌍 거시경제 분석가',
+  quant_analyst: '🔢 퀀트 분석가',
+  risk_manager: '🛡️ 리스크 관리자',
 };
 
 export default function PredictionsList({ predictions }: PredictionsListProps) {
@@ -45,9 +45,20 @@ export default function PredictionsList({ predictions }: PredictionsListProps) {
     }
   };
 
+  const getDirectionText = (direction: string) => {
+    switch (direction) {
+      case 'bullish':
+        return '상승';
+      case 'bearish':
+        return '하락';
+      default:
+        return '중립';
+    }
+  };
+
   return (
     <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
-      <h3 className="text-xl font-bold mb-4">🎯 Individual Expert Predictions</h3>
+      <h3 className="text-xl font-bold mb-4">🎯 개별 전문가 예측</h3>
 
       <div className="space-y-4">
         {predictions.map((prediction) => (
@@ -69,7 +80,7 @@ export default function PredictionsList({ predictions }: PredictionsListProps) {
                       typeof prediction.created_at === 'number'
                         ? prediction.created_at * 1000
                         : prediction.created_at
-                    ).toLocaleString() : 'Unknown date'}
+                    ).toLocaleString('ko-KR') : '날짜 미상'}
                   </p>
                 </div>
               </div>
@@ -81,12 +92,12 @@ export default function PredictionsList({ predictions }: PredictionsListProps) {
                   )}`}
                 >
                   {getDirectionIcon(prediction.direction)}
-                  <span className="font-medium capitalize">
-                    {prediction.direction}
+                  <span className="font-medium">
+                    {getDirectionText(prediction.direction)}
                   </span>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-slate-400">Confidence</p>
+                  <p className="text-sm text-slate-400">신뢰도</p>
                   <p className="text-lg font-bold">
                     {prediction.confidence.toFixed(0)}%
                   </p>
@@ -99,10 +110,10 @@ export default function PredictionsList({ predictions }: PredictionsListProps) {
             </div>
 
             <div className="mt-2 flex items-center gap-4 text-xs text-slate-400">
-              <span>Timeframe: {prediction.timeframe}</span>
+              <span>기간: {prediction.timeframe}</span>
               {prediction.is_active && (
                 <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded">
-                  Active
+                  활성
                 </span>
               )}
             </div>
