@@ -1,7 +1,7 @@
 // AI 전문가 자동 학습 Cron Job (매 1분)
 
 import type { Env } from '../types';
-import { binanceService } from '../services/exchanges/binance';
+import { upbitService } from '../services/exchanges/upbit';
 import { generateTechnicalSignals } from '../services/ai/signals';
 import {
   getAllExpertPredictions,
@@ -41,8 +41,8 @@ export async function runAILearning(env: Env): Promise<void> {
   try {
     // Step 1: BTC/ETH 가격 및 과거 데이터 가져오기
     const [btcPrices, ethPrices] = await Promise.all([
-      binanceService.getKlines('BTC', '1m', 100),
-      binanceService.getKlines('ETH', '1m', 100)
+      upbitService.getCandles('BTC', 1, 100),
+      upbitService.getCandles('ETH', 1, 100)
     ]);
 
     const btcCurrentPrice = btcPrices[btcPrices.length - 1].close;
