@@ -9,6 +9,17 @@ import { bithumbService } from './services/exchanges/bithumb';
 import { technicalAnalyst } from './services/analysis/technical';
 import { rssAggregator } from './services/rss/aggregator';
 
+// Import cron handlers
+import { handleScheduled as handleAILearning } from './cron/ai-learning';
+
+// Import AI services
+import {
+  getAllExpertStats,
+  getExpertStats,
+  loadExpertProfile
+} from './services/ai/database';
+import { expertProfiles } from './services/ai/experts';
+
 const app = new Hono<{ Bindings: Env }>();
 
 // CORS middleware
@@ -128,8 +139,8 @@ app.get('/api/influencer-mentions', async (c) => {
 
   try {
     const mentions = impactOnly
-      ? await rssAggregator.getHighImpactMentions(hours)
-      : await rssAggregator.getInfluencerMentions(hours);
+      ? await rssAggregator.getHighImpactMentions(hours, c.env)
+      : await rssAggregator.getInfluencerMentions(hours, c.env);
 
     return c.json({
       mentions,
@@ -147,7 +158,7 @@ app.get('/api/influencer-mentions/:symbol', async (c) => {
   const hours = parseInt(c.req.query('hours') || '24');
 
   try {
-    const allMentions = await rssAggregator.getInfluencerMentions(hours);
+    const allMentions = await rssAggregator.getInfluencerMentions(hours, c.env);
 
     // Filter by symbol
     const symbolMentions = allMentions.filter((mention) =>
@@ -261,6 +272,180 @@ app.get('/api/predictions/:symbol/consensus', async (c) => {
   }
 });
 
+// ==================== AI 전문가 시스템 API ====================
+
+// Get AI expert predictions
+app.get('/api/ai/predictions', async (c) => {
+  const coin = c.req.query('coin') || 'btc';
+  const timeframe = c.req.query('timeframe') || '5m';
+  const limit = parseInt(c.req.query('limit') || '10');
+
+  try {
+    const predictions = await c.env.DB
+      .prepare(
+        `SELECT p.*, ep.name, ep.emoji
+         FROM predictions p
+         JOIN expert_profiles ep ON p.expert_id = ep.id
+         WHERE p.coin = ? AND p.timeframe = ?
+         ORDER BY p.created_at DESC
+         LIMIT ?`
+      )
+      .bind(coin, timeframe, limit)
+      .all();
+
+    return c.json({
+      coin,
+      timeframe,
+      predictions: predictions.results.map(row => ({
+        id: row.id,
+        expertId: row.expert_id,
+        expertName: row.name,
+        expertEmoji: row.emoji,
+        signal: row.signal,
+        confidence: row.confidence,
+        entryPrice: row.entry_price,
+        exitPrice: row.exit_price,
+        status: row.status,
+        profitPercent: row.profit_percent,
+        indicatorContributions: JSON.parse(row.indicator_contributions as string),
+        createdAt: row.created_at,
+        checkedAt: row.checked_at
+      })),
+      count: predictions.results.length
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get all AI experts stats
+app.get('/api/ai/experts', async (c) => {
+  try {
+    const stats = await getAllExpertStats(c.env.DB);
+
+    // 전문가 프로필과 통계 결합
+    const expertsWithStats = expertProfiles.map(expert => {
+      const expertStats = stats.filter(s => s.expertId === expert.id);
+
+      const timeframeStats: any = {};
+      expertStats.forEach(s => {
+        timeframeStats[s.timeframe] = {
+          totalPredictions: s.totalPredictions,
+          successCount: s.successCount,
+          failCount: s.failCount,
+          pendingCount: s.pendingCount,
+          successRate: s.successRate,
+          lastUpdated: s.lastUpdated
+        };
+      });
+
+      return {
+        id: expert.id,
+        name: expert.name,
+        strategy: expert.strategy,
+        emoji: expert.emoji,
+        stats: timeframeStats
+      };
+    });
+
+    return c.json({
+      experts: expertsWithStats,
+      count: expertsWithStats.length
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get specific AI expert details
+app.get('/api/ai/experts/:id', async (c) => {
+  const expertId = parseInt(c.req.param('id'));
+
+  try {
+    const expert = await loadExpertProfile(c.env.DB, expertId);
+
+    return c.json({
+      expert: {
+        id: expert.id,
+        name: expert.name,
+        strategy: expert.strategy,
+        emoji: expert.emoji,
+        weights: expert.weights,
+        confidenceThreshold: expert.confidenceThreshold,
+        recentPerformance: expert.recentPerformance
+      }
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get AI consensus for a specific coin and timeframe
+app.get('/api/ai/consensus', async (c) => {
+  const coin = c.req.query('coin') || 'btc';
+  const timeframe = c.req.query('timeframe') || '5m';
+
+  try {
+    // 최근 1시간 이내 예측만 조회
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    const predictions = await c.env.DB
+      .prepare(
+        `SELECT p.*, ep.name, ep.emoji
+         FROM predictions p
+         JOIN expert_profiles ep ON p.expert_id = ep.id
+         WHERE p.coin = ? AND p.timeframe = ? AND p.created_at >= ?
+         AND p.status = 'pending'
+         ORDER BY p.created_at DESC`
+      )
+      .bind(coin, timeframe, oneHourAgo)
+      .all();
+
+    // 컨센서스 계산
+    const longCount = predictions.results.filter((p: any) => p.signal === 'long').length;
+    const shortCount = predictions.results.filter((p: any) => p.signal === 'short').length;
+    const neutralCount = predictions.results.filter((p: any) => p.signal === 'neutral').length;
+    const totalExperts = predictions.results.length;
+
+    let consensusSignal: 'long' | 'short' | 'neutral';
+    let consensusConfidence: number;
+
+    if (longCount > shortCount && longCount > neutralCount) {
+      consensusSignal = 'long';
+      consensusConfidence = totalExperts > 0 ? (longCount / totalExperts) * 100 : 0;
+    } else if (shortCount > longCount && shortCount > neutralCount) {
+      consensusSignal = 'short';
+      consensusConfidence = totalExperts > 0 ? (shortCount / totalExperts) * 100 : 0;
+    } else {
+      consensusSignal = 'neutral';
+      consensusConfidence = totalExperts > 0 ? (neutralCount / totalExperts) * 100 : 0;
+    }
+
+    return c.json({
+      coin,
+      timeframe,
+      consensus: {
+        signal: consensusSignal,
+        confidence: consensusConfidence,
+        longCount,
+        shortCount,
+        neutralCount,
+        totalExperts
+      },
+      predictions: predictions.results.map((row: any) => ({
+        expertId: row.expert_id,
+        expertName: row.name,
+        expertEmoji: row.emoji,
+        signal: row.signal,
+        confidence: row.confidence,
+        createdAt: row.created_at
+      }))
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 // Scheduled cron trigger handler
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -271,11 +456,15 @@ export default {
     // Handle cron triggers
     const cronType = event.cron;
 
-    console.log(`Cron triggered: ${cronType}`);
+    console.log(`⏰ Cron triggered: ${cronType} at ${new Date(event.scheduledTime).toISOString()}`);
 
-    // TODO: Implement cron handlers
-    // - Update prices every 1 minute
-    // - Fetch news every 5 minutes
-    // - Run analysis every 30 minutes
+    // AI 전문가 자동 학습 (매 1분)
+    if (cronType === '*/1 * * * *') {
+      await handleAILearning(event, env, ctx);
+    }
+
+    // TODO: Implement additional cron handlers
+    // - Fetch news every 5 minutes (*/5 * * * *)
+    // - Run analysis every 30 minutes (*/30 * * * *)
   },
 };

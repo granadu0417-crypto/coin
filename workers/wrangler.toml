@@ -17,6 +17,10 @@ database_id = "8ff0ba02-5060-4010-a055-52713706a06c"
 binding = "CACHE"
 id = "14e67312062e4a8c8fa293f1d8b077f7"
 
+# Cloudflare AI for translation
+[ai]
+binding = "AI"
+
 # Scheduled triggers (Cron)
 [triggers]
 crons = [
