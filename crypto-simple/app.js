@@ -7,7 +7,7 @@ let priceData = {
 };
 
 // ⚙️ Cloudflare Workers API 설정
-const WORKERS_API_URL = 'https://crypto-analysis-api.granadu91.workers.dev';
+const WORKERS_API_URL = 'https://crypto-analysis-api.granadu0417.workers.dev';
 // 로컬 개발: const WORKERS_API_URL = 'http://localhost:8787';
 
 // 🌐 API 호출 함수

@@ -17,7 +17,7 @@ interface ExpertStats {
   };
 }
 
-const WORKERS_API_URL = 'https://crypto-analysis-api.granadu91.workers.dev';
+const WORKERS_API_URL = 'https://crypto-analysis-api.granadu0417.workers.dev';
 
 export default function ExpertsStats() {
   const { data: experts, isLoading, error } = useQuery<ExpertStats[]>({
