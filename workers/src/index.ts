@@ -68,9 +68,8 @@ app.get('/api/prices/:symbol/history', async (c) => {
   try {
     let prices;
 
-    if (exchange === 'binance') {
-      prices = await binanceService.getKlines(symbol, '1m', limit);
-    } else if (exchange === 'upbit') {
+    // Binance is blocked on Cloudflare Workers, fallback to Upbit
+    if (exchange === 'binance' || exchange === 'upbit') {
       prices = await upbitService.getCandles(symbol, 1, limit);
     } else {
       return c.json({ error: 'Invalid exchange' }, 400);
