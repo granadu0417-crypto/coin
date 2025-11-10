@@ -1,9 +1,10 @@
-import type { RSSFeedItem, NewsArticle } from '../../types';
+import type { RSSFeedItem, NewsArticle, Env } from '../../types';
 import { sentimentAnalyzer } from '../analysis/sentiment';
 import {
   detectInfluencerMention,
   type InfluencerMention,
 } from '../influencers/detector';
+import { translateToKorean } from '../../utils/translation';
 
 /**
  * RSS Feed sources for crypto news
@@ -153,13 +154,25 @@ export class RSSAggregator {
    * Get influencer mentions from recent news
    * 최근 뉴스에서 유명인 발언 추출
    */
-  async getInfluencerMentions(hours: number = 24): Promise<InfluencerMention[]> {
+  async getInfluencerMentions(
+    hours: number = 24,
+    env?: Env
+  ): Promise<InfluencerMention[]> {
     const recentNews = await this.getRecentNews(hours);
     const mentions: InfluencerMention[] = [];
 
     for (const article of recentNews) {
       const mention = detectInfluencerMention(article);
       if (mention) {
+        // Translate content to Korean if AI binding is available
+        if (env?.AI) {
+          try {
+            mention.content_ko = await translateToKorean(mention.content, env);
+          } catch (error) {
+            console.error('Translation failed:', error);
+            // Continue without translation if it fails
+          }
+        }
         mentions.push(mention);
       }
     }
@@ -182,8 +195,11 @@ export class RSSAggregator {
    * Get high-impact influencer mentions only
    * 높은 영향력 유명인 발언만 가져오기
    */
-  async getHighImpactMentions(hours: number = 24): Promise<InfluencerMention[]> {
-    const allMentions = await this.getInfluencerMentions(hours);
+  async getHighImpactMentions(
+    hours: number = 24,
+    env?: Env
+  ): Promise<InfluencerMention[]> {
+    const allMentions = await this.getInfluencerMentions(hours, env);
     return allMentions.filter((mention) => mention.impact_level === 'high');
   }
 }

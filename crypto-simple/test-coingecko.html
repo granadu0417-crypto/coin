@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoinGecko API 테스트</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #334155;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #475569;
+        }
+        .test-section h2 {
+            color: #60a5fa;
+            margin-top: 0;
+        }
+        .success {
+            color: #22c55e;
+        }
+        .error {
+            color: #ef4444;
+        }
+        .loading {
+            color: #fbbf24;
+        }
+        pre {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 CoinGecko API 테스트</h1>
+
+    <div class="info-box">
+        <strong>📌 테스트 목적:</strong> CoinGecko API가 API 키 없이 작동하는지, 어떤 데이터를 제공하는지 확인
+    </div>
+
+    <!-- 1. 기본 가격 정보 -->
+    <div class="test-section">
+        <h2>1️⃣ 간단한 가격 정보 (/simple/price)</h2>
+        <p>여러 코인의 현재 가격, 시가총액, 24시간 거래량 조회</p>
+        <button onclick="testSimplePrice()">테스트 실행</button>
+        <div id="simple-price-result" class="loading">테스트 대기 중...</div>
+        <pre id="simple-price-data"></pre>
+    </div>
+
+    <!-- 2. 상세 코인 정보 -->
+    <div class="test-section">
+        <h2>2️⃣ 비트코인 상세 정보 (/coins/bitcoin)</h2>
+        <p>시가총액, 거래량, 커뮤니티 데이터, 개발자 데이터 등</p>
+        <button onclick="testCoinDetail()">테스트 실행</button>
+        <div id="coin-detail-result" class="loading">테스트 대기 중...</div>
+        <pre id="coin-detail-data"></pre>
+    </div>
+
+    <!-- 3. 시장 차트 데이터 -->
+    <div class="test-section">
+        <h2>3️⃣ 시장 차트 데이터 (/coins/bitcoin/market_chart)</h2>
+        <p>가격, 시가총액, 거래량 시계열 데이터 (최근 7일)</p>
+        <button onclick="testMarketChart()">테스트 실행</button>
+        <div id="market-chart-result" class="loading">테스트 대기 중...</div>
+        <pre id="market-chart-data"></pre>
+    </div>
+
+    <!-- 4. 시장 데이터 (여러 코인) -->
+    <div class="test-section">
+        <h2>4️⃣ 시장 데이터 - 상위 10개 코인 (/coins/markets)</h2>
+        <p>가격, 변동률, 시가총액, 거래량 등 (정렬 가능)</p>
+        <button onclick="testCoinsMarkets()">테스트 실행</button>
+        <div id="coins-markets-result" class="loading">테스트 대기 중...</div>
+        <pre id="coins-markets-data"></pre>
+    </div>
+
+    <!-- 5. 트렌딩 코인 -->
+    <div class="test-section">
+        <h2>5️⃣ 트렌딩 코인 (/search/trending)</h2>
+        <p>지금 가장 인기 있는 코인들 (검색량 기준)</p>
+        <button onclick="testTrending()">테스트 실행</button>
+        <div id="trending-result" class="loading">테스트 대기 중...</div>
+        <pre id="trending-data"></pre>
+    </div>
+
+    <!-- 6. 글로벌 데이터 -->
+    <div class="test-section">
+        <h2>6️⃣ 글로벌 암호화폐 데이터 (/global)</h2>
+        <p>전체 시장 시가총액, 비트코인 도미넌스 등</p>
+        <button onclick="testGlobal()">테스트 실행</button>
+        <div id="global-result" class="loading">테스트 대기 중...</div>
+        <pre id="global-data"></pre>
+    </div>
+
+    <script>
+        const BASE_URL = 'https://api.coingecko.com/api/v3';
+
+        // 1. 간단한 가격 정보
+        async function testSimplePrice() {
+            const resultEl = document.getElementById('simple-price-result');
+            const dataEl = document.getElementById('simple-price-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                const response = await fetch(
+                    `${BASE_URL}/simple/price?ids=bitcoin,ethereum&vs_currencies=krw,usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`
+                );
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! BTC: ₩${data.bitcoin.krw.toLocaleString()} | ETH: ₩${data.ethereum.krw.toLocaleString()}`;
+                dataEl.textContent = JSON.stringify(data, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = error.stack;
+            }
+        }
+
+        // 2. 비트코인 상세 정보
+        async function testCoinDetail() {
+            const resultEl = document.getElementById('coin-detail-result');
+            const dataEl = document.getElementById('coin-detail-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                const response = await fetch(
+                    `${BASE_URL}/coins/bitcoin?localization=false&tickers=false&market_data=true&community_data=true&developer_data=true&sparkline=false`
+                );
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 시가총액: $${(data.market_data.market_cap.usd / 1e9).toFixed(2)}B | 24h 거래량: $${(data.market_data.total_volume.usd / 1e9).toFixed(2)}B`;
+
+                // 중요한 데이터만 추출해서 표시
+                const summary = {
+                    name: data.name,
+                    symbol: data.symbol,
+                    current_price_krw: data.market_data.current_price.krw,
+                    market_cap_rank: data.market_cap_rank,
+                    market_cap_usd: data.market_data.market_cap.usd,
+                    total_volume_usd: data.market_data.total_volume.usd,
+                    price_change_24h: data.market_data.price_change_percentage_24h,
+                    circulating_supply: data.market_data.circulating_supply,
+                    total_supply: data.market_data.total_supply,
+                    ath_krw: data.market_data.ath.krw,
+                    ath_date: data.market_data.ath_date.krw,
+                    community_data: data.community_data,
+                    developer_data: {
+                        forks: data.developer_data.forks,
+                        stars: data.developer_data.stars,
+                        subscribers: data.developer_data.subscribers,
+                        total_issues: data.developer_data.total_issues
+                    }
+                };
+
+                dataEl.textContent = JSON.stringify(summary, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = error.stack;
+            }
+        }
+
+        // 3. 시장 차트 데이터
+        async function testMarketChart() {
+            const resultEl = document.getElementById('market-chart-result');
+            const dataEl = document.getElementById('market-chart-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                const response = await fetch(
+                    `${BASE_URL}/coins/bitcoin/market_chart?vs_currency=krw&days=7&interval=daily`
+                );
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 가격 데이터: ${data.prices.length}개 | 거래량 데이터: ${data.total_volumes.length}개`;
+
+                // 요약된 데이터만 표시
+                const summary = {
+                    prices_count: data.prices.length,
+                    first_price: data.prices[0],
+                    last_price: data.prices[data.prices.length - 1],
+                    volumes_count: data.total_volumes.length,
+                    sample_prices: data.prices.slice(0, 3),
+                    sample_volumes: data.total_volumes.slice(0, 3)
+                };
+
+                dataEl.textContent = JSON.stringify(summary, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = error.stack;
+            }
+        }
+
+        // 4. 시장 데이터 (여러 코인)
+        async function testCoinsMarkets() {
+            const resultEl = document.getElementById('coins-markets-result');
+            const dataEl = document.getElementById('coins-markets-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                const response = await fetch(
+                    `${BASE_URL}/coins/markets?vs_currency=krw&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`
+                );
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 상위 ${data.length}개 코인 데이터 수신`;
+
+                // 각 코인의 주요 정보만 추출
+                const summary = data.map(coin => ({
+                    rank: coin.market_cap_rank,
+                    name: coin.name,
+                    symbol: coin.symbol,
+                    current_price: coin.current_price,
+                    price_change_24h: coin.price_change_percentage_24h,
+                    market_cap: coin.market_cap,
+                    total_volume: coin.total_volume
+                }));
+
+                dataEl.textContent = JSON.stringify(summary, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = error.stack;
+            }
+        }
+
+        // 5. 트렌딩 코인
+        async function testTrending() {
+            const resultEl = document.getElementById('trending-result');
+            const dataEl = document.getElementById('trending-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                const response = await fetch(`${BASE_URL}/search/trending`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 트렌딩 코인 ${data.coins.length}개 발견`;
+
+                // 트렌딩 코인 정보 추출
+                const summary = {
+                    coins: data.coins.map(item => ({
+                        rank: item.item.market_cap_rank,
+                        name: item.item.name,
+                        symbol: item.item.symbol,
+                        price_btc: item.item.price_btc
+                    }))
+                };
+
+                dataEl.textContent = JSON.stringify(summary, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = error.stack;
+            }
+        }
+
+        // 6. 글로벌 데이터
+        async function testGlobal() {
+            const resultEl = document.getElementById('global-result');
+            const dataEl = document.getElementById('global-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                const response = await fetch(`${BASE_URL}/global`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 전체 시가총액: $${(data.data.total_market_cap.usd / 1e12).toFixed(2)}T | BTC 도미넌스: ${data.data.market_cap_percentage.btc.toFixed(1)}%`;
+
+                dataEl.textContent = JSON.stringify(data.data, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = error.stack;
+            }
+        }
+
+        // 페이지 로드 시 첫 번째 테스트 자동 실행
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🧪 CoinGecko API 테스트 페이지 준비 완료');
+            testSimplePrice(); // 자동 실행
+        });
+    </script>
+</body>
+</html>

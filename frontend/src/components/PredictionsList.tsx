@@ -57,22 +57,24 @@ export default function PredictionsList({ predictions }: PredictionsListProps) {
   };
 
   return (
-    <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
-      <h3 className="text-xl font-bold mb-4">🎯 개별 전문가 예측</h3>
+    <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-slate-700 shadow-xl hover:shadow-2xl transition-shadow">
+      <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+        🎯 <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">개별 전문가 예측</span>
+      </h3>
 
-      <div className="space-y-4">
+      <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         {predictions.map((prediction) => (
           <div
             key={prediction.id}
-            className="bg-slate-700/50 rounded-lg p-4 border border-slate-600"
+            className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 rounded-xl p-3 border border-slate-600/50 hover:border-slate-500 hover:shadow-lg transition-all"
           >
-            <div className="flex items-start justify-between mb-3">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-3">
-                <div className="bg-slate-600 rounded-full p-2">
+                <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-full p-2.5 border border-slate-500">
                   <User className="w-5 h-5 text-slate-300" />
                 </div>
                 <div>
-                  <p className="font-semibold">
+                  <p className="font-bold text-white">
                     {PERSONA_NAMES[prediction.analyst || prediction.persona || 'unknown'] || prediction.analyst || prediction.persona || 'Unknown'}
                   </p>
                   <p className="text-xs text-slate-400">
@@ -87,32 +89,34 @@ export default function PredictionsList({ predictions }: PredictionsListProps) {
 
               <div className="flex items-center gap-3">
                 <div
-                  className={`flex items-center gap-2 px-3 py-1 rounded-full border ${getDirectionColor(
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 ${getDirectionColor(
                     prediction.direction
                   )}`}
                 >
                   {getDirectionIcon(prediction.direction)}
-                  <span className="font-medium">
+                  <span className="font-bold">
                     {getDirectionText(prediction.direction)}
                   </span>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-slate-400">신뢰도</p>
-                  <p className="text-lg font-bold">
+                <div className="text-right bg-slate-700/50 rounded-xl px-3 py-2 border border-slate-600/50">
+                  <p className="text-xs text-slate-400">신뢰도</p>
+                  <p className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                     {prediction.confidence.toFixed(0)}%
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-slate-800 rounded p-3">
-              <p className="text-sm text-slate-300">{prediction.reasoning}</p>
+            <div className="bg-slate-800/70 rounded-lg p-3 border border-slate-700/50">
+              <p className="text-xs text-slate-200 leading-relaxed line-clamp-3">{prediction.reasoning}</p>
             </div>
 
-            <div className="mt-2 flex items-center gap-4 text-xs text-slate-400">
-              <span>기간: {prediction.timeframe}</span>
+            <div className="mt-2 flex items-center gap-3 text-xs">
+              <span className="px-3 py-1 bg-slate-700/50 text-slate-300 rounded-full border border-slate-600/50">
+                기간: {prediction.timeframe}
+              </span>
               {prediction.is_active && (
-                <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded">
+                <span className="px-3 py-1 bg-gradient-to-r from-blue-500/30 to-purple-500/30 text-blue-300 rounded-full border border-blue-500/50">
                   활성
                 </span>
               )}

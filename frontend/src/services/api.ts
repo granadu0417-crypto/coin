@@ -78,4 +78,31 @@ export const predictionsApi = {
   },
 };
 
+export interface InfluencerMention {
+  influencer_name: string;
+  platform: string;
+  content: string;
+  url: string;
+  symbols: string;
+  sentiment_score: number;
+  impact_level: 'high' | 'medium' | 'low';
+  published_at: number;
+}
+
+export const influencerApi = {
+  getAll: async (hours: number = 24, impactOnly: boolean = false): Promise<InfluencerMention[]> => {
+    const response = await api.get('/api/influencer-mentions', {
+      params: { hours, impact: impactOnly ? 'high' : undefined },
+    });
+    return response.data.mentions || [];
+  },
+
+  getBySymbol: async (symbol: string, hours: number = 24): Promise<InfluencerMention[]> => {
+    const response = await api.get(`/api/influencer-mentions/${symbol}`, {
+      params: { hours },
+    });
+    return response.data.mentions || [];
+  },
+};
+
 export default api;

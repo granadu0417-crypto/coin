@@ -2,6 +2,7 @@
 export interface Env {
   DB: D1Database;
   CACHE: KVNamespace;
+  AI: any; // Cloudflare AI binding for translation
   ALLOWED_ORIGINS: string;
 }
 

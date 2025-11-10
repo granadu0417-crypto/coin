@@ -10,6 +10,7 @@ export interface InfluencerMention {
   influencer_name: string;
   platform: string;
   content: string;
+  content_ko?: string; // Korean translation
   url: string;
   symbols: string;
   sentiment_score: number;

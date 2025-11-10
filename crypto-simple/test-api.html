@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 테스트</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #334155;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #475569;
+        }
+        .test-section h2 {
+            color: #60a5fa;
+            margin-top: 0;
+        }
+        .success {
+            color: #22c55e;
+        }
+        .error {
+            color: #ef4444;
+        }
+        .loading {
+            color: #fbbf24;
+        }
+        pre {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 암호화폐 정보 API 테스트</h1>
+
+    <!-- 1. 공포-탐욕 지수 -->
+    <div class="test-section">
+        <h2>1️⃣ 공포-탐욕 지수 (Fear & Greed Index)</h2>
+        <button onclick="testFearGreed()">테스트 실행</button>
+        <div id="fear-greed-result" class="loading">테스트 대기 중...</div>
+        <pre id="fear-greed-data"></pre>
+    </div>
+
+    <!-- 2. 고래 추적 -->
+    <div class="test-section">
+        <h2>2️⃣ 고래 거래 추적 (Whale Alert)</h2>
+        <button onclick="testWhaleAlert()">테스트 실행</button>
+        <div id="whale-result" class="loading">테스트 대기 중...</div>
+        <pre id="whale-data"></pre>
+        <p style="font-size: 12px; color: #94a3b8;">
+            ⚠️ Whale Alert는 API 키가 필요합니다 (무료 플랜 가능)<br>
+            가입: <a href="https://whale-alert.io/" target="_blank" style="color: #60a5fa;">https://whale-alert.io/</a>
+        </p>
+    </div>
+
+    <!-- 3. 청산 데이터 -->
+    <div class="test-section">
+        <h2>3️⃣ 청산 데이터 (Coinglass)</h2>
+        <button onclick="testCoinglass()">테스트 실행</button>
+        <div id="coinglass-result" class="loading">테스트 대기 중...</div>
+        <pre id="coinglass-data"></pre>
+    </div>
+
+    <!-- 4. 뉴스 -->
+    <div class="test-section">
+        <h2>4️⃣ 암호화폐 뉴스 (CryptoCompare)</h2>
+        <button onclick="testCryptoNews()">테스트 실행</button>
+        <div id="news-result" class="loading">테스트 대기 중...</div>
+        <pre id="news-data"></pre>
+    </div>
+
+    <script>
+        // 1. 공포-탐욕 지수 테스트
+        async function testFearGreed() {
+            const resultEl = document.getElementById('fear-greed-result');
+            const dataEl = document.getElementById('fear-greed-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                const response = await fetch('https://api.alternative.me/fng/?limit=10');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 현재 지수: ${data.data[0].value} (${data.data[0].value_classification})`;
+
+                dataEl.textContent = JSON.stringify(data, null, 2);
+
+                // 간단한 분석
+                console.log('공포-탐욕 지수:', data.data[0]);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = error.stack;
+            }
+        }
+
+        // 2. 고래 추적 테스트
+        async function testWhaleAlert() {
+            const resultEl = document.getElementById('whale-result');
+            const dataEl = document.getElementById('whale-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                // Whale Alert API 키 필요 (무료 플랜: 1000 calls/month)
+                const API_KEY = 'demo'; // 여기에 실제 API 키 입력
+
+                const response = await fetch(`https://api.whale-alert.io/v1/transactions?api_key=${API_KEY}&min_value=500000&limit=10`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} - API 키가 필요합니다`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 최근 거래 ${data.transactions?.length || 0}건 발견`;
+
+                dataEl.textContent = JSON.stringify(data, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = `
+API 키 등록 방법:
+1. https://whale-alert.io/ 접속
+2. 무료 계정 가입
+3. API 키 발급 (1000 calls/month 무료)
+4. 이 코드의 API_KEY에 입력
+
+에러 상세:
+${error.stack}`;
+            }
+        }
+
+        // 3. Coinglass 청산 데이터 테스트
+        async function testCoinglass() {
+            const resultEl = document.getElementById('coinglass-result');
+            const dataEl = document.getElementById('coinglass-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                // Coinglass API (일부 엔드포인트는 무료)
+                const response = await fetch('https://open-api.coinglass.com/public/v2/liquidation_history?symbol=BTC&time_type=h1');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 데이터 수신됨`;
+
+                dataEl.textContent = JSON.stringify(data, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = `
+Coinglass는 CORS 제한이 있을 수 있습니다.
+대안: 프록시 사용 또는 다른 청산 데이터 API 사용
+
+에러 상세:
+${error.stack}`;
+            }
+        }
+
+        // 4. 암호화폐 뉴스 테스트
+        async function testCryptoNews() {
+            const resultEl = document.getElementById('news-result');
+            const dataEl = document.getElementById('news-data');
+
+            resultEl.className = 'loading';
+            resultEl.textContent = '⏳ API 호출 중...';
+            dataEl.textContent = '';
+
+            try {
+                // CryptoCompare 뉴스 API (무료, 제한적)
+                const response = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                resultEl.className = 'success';
+                resultEl.innerHTML = `✅ 성공! 뉴스 ${data.Data?.length || 0}개 수신`;
+
+                dataEl.textContent = JSON.stringify(data, null, 2);
+
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `❌ 실패: ${error.message}`;
+                dataEl.textContent = error.stack;
+            }
+        }
+
+        // 페이지 로드 시 공포-탐욕 지수 자동 테스트
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🧪 API 테스트 페이지 준비 완료');
+            testFearGreed(); // 자동 실행
+        });
+    </script>
+</body>
+</html>

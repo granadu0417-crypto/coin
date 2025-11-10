@@ -62,3 +62,7 @@ coverage/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Wrangler build files
+workers/.wrangler/
+.wrangler/
