@@ -5,6 +5,7 @@ import PriceCard from './PriceCard';
 import ConsensusView from './ConsensusView';
 import PredictionsList from './PredictionsList';
 import InfluencerTimeline from './InfluencerTimeline';
+import ExpertsStats from './ExpertsStats';
 
 const TRACKED_COINS = [
   { symbol: 'BTC', name: 'Bitcoin', emoji: '₿' },
@@ -116,11 +117,16 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Full Width: AI Experts Stats (24/7 Learning) */}
+        <div className="mt-6">
+          <ExpertsStats />
+        </div>
       </main>
 
       {/* Footer */}
       <footer className="mt-8 py-4 border-t border-slate-800 text-center text-slate-500 text-xs">
-        <p>실시간 데이터 제공: Upbit, Bithumb · AI 분석: 기술적 분석가</p>
+        <p>실시간 데이터 제공: Upbit, Bithumb · AI 분석: 10명의 전문가 (24/7 자동 학습)</p>
         <p className="mt-1">© 2025 암호화폐 분석 플랫폼. 투자 결정은 신중하게.</p>
       </footer>
     </div>
