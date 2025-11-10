@@ -1,6 +1,6 @@
 import type { ExchangeTicker, Price } from '../../types';
 
-const BINANCE_API = 'https://api.binance.com/api/v3';
+const BINANCE_API = 'https://data-api.binance.vision/api/v3'; // Public data endpoint (no IP restrictions)
 
 export class BinanceService {
   /**
