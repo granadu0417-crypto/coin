@@ -8,7 +8,12 @@ export class BinanceService {
    */
   async getTicker(symbol: string): Promise<ExchangeTicker> {
     const response = await fetch(
-      `${BINANCE_API}/ticker/24hr?symbol=${symbol}USDT`
+      `${BINANCE_API}/ticker/24hr?symbol=${symbol}USDT`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; CryptoAnalysisBot/1.0)',
+        },
+      }
     );
 
     if (!response.ok) {
@@ -36,7 +41,12 @@ export class BinanceService {
     limit: number = 100
   ): Promise<Price[]> {
     const response = await fetch(
-      `${BINANCE_API}/klines?symbol=${symbol}USDT&interval=${interval}&limit=${limit}`
+      `${BINANCE_API}/klines?symbol=${symbol}USDT&interval=${interval}&limit=${limit}`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; CryptoAnalysisBot/1.0)',
+        },
+      }
     );
 
     if (!response.ok) {
