@@ -100,7 +100,7 @@ export async function runAILearning(env: Env): Promise<void> {
     for (const prediction of pendingPredictions) {
       // 현재 가격 가져오기
       const symbol = prediction.coin === 'btc' ? 'BTC' : 'ETH';
-      const ticker = await binanceService.getTicker(symbol);
+      const ticker = await upbitService.getTicker(symbol);
       const exitPrice = ticker.price;
 
       // 예측 검증
