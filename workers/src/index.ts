@@ -62,7 +62,7 @@ app.get('/api/prices/:symbol', async (c) => {
 // Get historical price data
 app.get('/api/prices/:symbol/history', async (c) => {
   const symbol = c.req.param('symbol').toUpperCase();
-  const exchange = c.req.query('exchange') || 'binance';
+  const exchange = c.req.query('exchange') || 'upbit';
   const limit = parseInt(c.req.query('limit') || '100');
 
   try {
@@ -92,9 +92,9 @@ app.get('/api/analysis/:symbol', async (c) => {
   const symbol = c.req.param('symbol').toUpperCase();
 
   try {
-    // Fetch price history
-    const prices = await binanceService.getKlines(symbol, '1m', 100);
-    const ticker = await binanceService.getTicker(symbol);
+    // Fetch price history (using Upbit since Binance is blocked on Cloudflare Workers)
+    const prices = await upbitService.getCandles(symbol, 1, 100);
+    const ticker = await upbitService.getTicker(symbol);
 
     // Perform analysis
     const analysis = technicalAnalyst.analyze({
