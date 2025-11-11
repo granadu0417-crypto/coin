@@ -26,29 +26,6 @@ const formatToKST = (utcTimeStr: string, format: 'full' | 'short' = 'full') => {
   });
 };
 
-// UTC 시간을 UTC 타임존 그대로 표시하는 유틸리티 함수
-const formatToUTC = (utcTimeStr: string, format: 'full' | 'short' = 'full') => {
-  // UTC 시간 문자열에 'Z'를 추가하여 UTC임을 명시
-  const date = new Date(utcTimeStr.endsWith('Z') ? utcTimeStr : `${utcTimeStr}Z`);
-
-  if (format === 'short') {
-    return date.toLocaleDateString('ko-KR', {
-      timeZone: 'UTC',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit'
-    });
-  }
-
-  return date.toLocaleString('ko-KR', {
-    timeZone: 'UTC',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
-
 export default function History() {
   const [coin, setCoin] = useState<'btc' | 'eth'>('btc');
   const [selectedExpert, setSelectedExpert] = useState<number | undefined>(undefined);
