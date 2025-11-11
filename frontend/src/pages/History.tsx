@@ -374,10 +374,29 @@ export default function History() {
 
                 return sortedDates.map(date => {
                   const dateStats = statsByDate[date];
+
+                  // Create full model list with ALL 10 models (including those with no trades)
+                  const allModelsForDate = experts.map(expert => {
+                    const stat = dateStats.find(s => s.expertName === expert.name);
+                    return stat ? stat : {
+                      expertName: expert.name,
+                      expertEmoji: expert.emoji,
+                      date: date,
+                      trades: 0,
+                      wins: 0,
+                      losses: 0,
+                      totalProfit: 0,
+                      avgProfitPercent: 0,
+                      bestTradePercent: 0,
+                      worstTradePercent: 0
+                    };
+                  });
+
                   // Sort models by profit for this date
-                  const rankedStats = [...dateStats].sort((a, b) => b.totalProfit - a.totalProfit);
+                  const rankedStats = [...allModelsForDate].sort((a, b) => b.totalProfit - a.totalProfit);
                   const totalTrades = dateStats.reduce((sum, s) => sum + s.trades, 0);
                   const totalProfit = dateStats.reduce((sum, s) => sum + s.totalProfit, 0);
+                  const bestModel = rankedStats.find(s => s.trades > 0) || rankedStats[0];
 
                   return (
                     <div key={date} className="bg-slate-800/30 rounded-xl p-6 border border-slate-700">
@@ -402,7 +421,7 @@ export default function History() {
                         <div className="text-right">
                           <div className="text-sm text-slate-500">최고 모델</div>
                           <div className="text-lg font-bold text-yellow-400">
-                            {rankedStats[0].expertEmoji} {rankedStats[0].expertName}
+                            {bestModel.expertEmoji} {bestModel.expertName}
                           </div>
                         </div>
                       </div>
@@ -424,54 +443,72 @@ export default function History() {
                             </tr>
                           </thead>
                           <tbody>
-                            {rankedStats.map((stat, index) => (
-                              <tr key={stat.expertName} className="border-b border-slate-700/30 hover:bg-slate-700/20">
-                                <td className="py-3">
-                                  {index < 3 && (
-                                    <span className="text-xl">
-                                      {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xl">{stat.expertEmoji}</span>
-                                    <span className="text-white font-medium">{stat.expertName}</span>
-                                  </div>
-                                </td>
-                                <td className="py-3 text-center text-slate-200 font-bold text-lg">{stat.trades}</td>
-                                <td className="py-3 text-center text-base">
-                                  <span className="text-green-400 font-bold">{stat.wins}</span>
-                                  <span className="text-slate-600 mx-1">/</span>
-                                  <span className="text-red-400 font-bold">{stat.losses}</span>
-                                </td>
-                                <td className="py-3 text-center">
-                                  <span className={`px-2 py-1 rounded-lg font-bold text-sm ${
-                                    (stat.wins / stat.trades * 100) >= 60 ? 'bg-green-500/30 text-green-300' :
-                                    (stat.wins / stat.trades * 100) >= 50 ? 'bg-yellow-500/30 text-yellow-300' :
-                                    'bg-red-500/30 text-red-300'
+                            {rankedStats.map((stat, index) => {
+                              const hasData = stat.trades > 0;
+                              return (
+                                <tr key={stat.expertName} className={`border-b border-slate-700/30 hover:bg-slate-700/20 ${!hasData ? 'opacity-40' : ''}`}>
+                                  <td className="py-3">
+                                    {hasData && index < 3 && (
+                                      <span className="text-xl">
+                                        {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl">{stat.expertEmoji}</span>
+                                      <span className="text-white font-medium">{stat.expertName}</span>
+                                      {!hasData && (
+                                        <span className="ml-2 px-2 py-0.5 bg-slate-600/50 text-slate-400 text-xs rounded">거래없음</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 text-center text-slate-200 font-bold text-lg">
+                                    {hasData ? stat.trades : '-'}
+                                  </td>
+                                  <td className="py-3 text-center text-base">
+                                    {hasData ? (
+                                      <>
+                                        <span className="text-green-400 font-bold">{stat.wins}</span>
+                                        <span className="text-slate-600 mx-1">/</span>
+                                        <span className="text-red-400 font-bold">{stat.losses}</span>
+                                      </>
+                                    ) : (
+                                      <span className="text-slate-500">-</span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 text-center">
+                                    {hasData ? (
+                                      <span className={`px-2 py-1 rounded-lg font-bold text-sm ${
+                                        (stat.wins / stat.trades * 100) >= 60 ? 'bg-green-500/30 text-green-300' :
+                                        (stat.wins / stat.trades * 100) >= 50 ? 'bg-yellow-500/30 text-yellow-300' :
+                                        'bg-red-500/30 text-red-300'
+                                      }`}>
+                                        {((stat.wins / stat.trades) * 100).toFixed(0)}%
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-500">-</span>
+                                    )}
+                                  </td>
+                                  <td className={`py-3 text-right font-bold text-lg ${
+                                    hasData ? (stat.totalProfit >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'
                                   }`}>
-                                    {((stat.wins / stat.trades) * 100).toFixed(0)}%
-                                  </span>
-                                </td>
-                                <td className={`py-3 text-right font-bold text-lg ${
-                                  stat.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                                }`}>
-                                  {stat.totalProfit >= 0 ? '+' : ''}${(stat.totalProfit / 1000).toFixed(1)}K
-                                </td>
-                                <td className={`py-3 text-right font-semibold ${
-                                  stat.avgProfitPercent >= 0 ? 'text-green-400' : 'text-red-400'
-                                }`}>
-                                  {stat.avgProfitPercent >= 0 ? '+' : ''}{stat.avgProfitPercent.toFixed(2)}%
-                                </td>
-                                <td className="py-3 text-right text-green-400 font-semibold">
-                                  +{stat.bestTradePercent.toFixed(2)}%
-                                </td>
-                                <td className="py-3 text-right text-red-400 font-semibold">
-                                  {stat.worstTradePercent.toFixed(2)}%
-                                </td>
-                              </tr>
-                            ))}
+                                    {hasData ? `${stat.totalProfit >= 0 ? '+' : ''}$${(stat.totalProfit / 1000).toFixed(1)}K` : '-'}
+                                  </td>
+                                  <td className={`py-3 text-right font-semibold ${
+                                    hasData ? (stat.avgProfitPercent >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'
+                                  }`}>
+                                    {hasData ? `${stat.avgProfitPercent >= 0 ? '+' : ''}${stat.avgProfitPercent.toFixed(2)}%` : '-'}
+                                  </td>
+                                  <td className={`py-3 text-right font-semibold ${hasData ? 'text-green-400' : 'text-slate-500'}`}>
+                                    {hasData ? `+${stat.bestTradePercent.toFixed(2)}%` : '-'}
+                                  </td>
+                                  <td className={`py-3 text-right font-semibold ${hasData ? 'text-red-400' : 'text-slate-500'}`}>
+                                    {hasData ? `${stat.worstTradePercent.toFixed(2)}%` : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
