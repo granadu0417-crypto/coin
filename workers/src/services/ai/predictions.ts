@@ -9,8 +9,14 @@ import type {
   IndicatorWeights,
   Timeframe
 } from '../../types/ai';
+import type { D1Database } from '@cloudflare/workers-types';
 import { getExpertProfile, EXPERT_IDS } from './experts';
 import { applyIndicatorImportance } from './learning';
+import {
+  predictByMetaEnsemble,
+  predictByPatternLearning,
+  predictByContrarian
+} from './advanced-experts';
 
 /**
  * Phase 1-1 & Phase 1-2 & Phase 2-3: 전문가별 예측 생성
@@ -127,7 +133,7 @@ export function predictByExpert(
 }
 
 /**
- * 모든 전문가의 예측 생성
+ * 모든 전문가의 예측 생성 (전문가 #1-10)
  *
  * @param coin 코인 ('btc' | 'eth')
  * @param timeframe 타임프레임 ('5m' | '10m' | '30m' | '1h')
@@ -145,7 +151,10 @@ export function getAllExpertPredictions(
 ): Prediction[] {
   const predictions: Prediction[] = [];
 
-  EXPERT_IDS.forEach(expertId => {
+  // 기본 전문가 #1-10만 처리
+  const basicExpertIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+  basicExpertIds.forEach(expertId => {
     const importance = importanceMap?.get(expertId) || null;
     const prediction = predictByExpert(
       expertId,
@@ -166,6 +175,59 @@ export function getAllExpertPredictions(
   );
 
   return predictions;
+}
+
+/**
+ * 고급 전문가 포함 모든 예측 생성 (전문가 #1-13)
+ *
+ * @param db D1 Database
+ * @param coin 코인 ('btc' | 'eth')
+ * @param timeframe 타임프레임 ('5m' | '10m' | '30m' | '1h')
+ * @param signals 기술적 지표 시그널
+ * @param currentPrice 현재 가격
+ * @param importanceMap 전문가별 지표 중요도 맵 (optional)
+ * @returns 예측 결과 배열 (최대 13개)
+ */
+export async function getAllExpertPredictionsWithAdvanced(
+  db: D1Database,
+  coin: 'btc' | 'eth',
+  timeframe: Timeframe,
+  signals: TechnicalSignals,
+  currentPrice: number,
+  importanceMap?: Map<number, IndicatorImportance>
+): Promise<Prediction[]> {
+  // 1. 기본 전문가 #1-10 예측 생성
+  const basicPredictions = getAllExpertPredictions(
+    coin,
+    timeframe,
+    signals,
+    currentPrice,
+    importanceMap
+  );
+
+  // 2. 고급 전문가 #11-13 예측 생성
+  const advancedPredictions: (Prediction | null)[] = await Promise.all([
+    // Expert #11: 메타 앙상블 (상위 3개 전문가 성과 기반)
+    predictByMetaEnsemble(db, coin, timeframe, signals, currentPrice, basicPredictions),
+
+    // Expert #12: 패턴 학습 (과거 성공 패턴 매칭)
+    predictByPatternLearning(db, coin, timeframe, signals, currentPrice),
+
+    // Expert #13: 역발상 (군중 심리 역이용)
+    predictByContrarian(db, coin, timeframe, signals, currentPrice, basicPredictions)
+  ]);
+
+  // 3. null 제거하고 합치기
+  const allPredictions = [
+    ...basicPredictions,
+    ...advancedPredictions.filter(p => p !== null) as Prediction[]
+  ];
+
+  console.log(
+    `🧠 ${coin.toUpperCase()} ${timeframe}: ${allPredictions.length}/13 전문가 예측 생성 (고급 ${advancedPredictions.filter(p => p !== null).length}개 포함)`
+  );
+
+  return allPredictions;
 }
 
 /**

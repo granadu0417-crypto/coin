@@ -321,6 +321,102 @@ export const expertProfiles: ExpertProfile[] = [
     recentPerformance: {
       '5m': [], '10m': [], '30m': [], '1h': []
     }
+  },
+
+  // Expert #11: 메타 앙상블 전문가 (Meta AI Master)
+  {
+    id: 11,
+    name: 'AI 마스터',
+    strategy: '전문가 집단지성 활용',
+    emoji: '🧠',
+    weights: {
+      '5m': {
+        rsi: 0.55, macd: 0.60, bollinger: 0.55,
+        funding: 0.60, volume: 0.65, trend: 0.50, fearGreed: 0.15
+      },
+      '10m': {
+        rsi: 0.60, macd: 0.60, bollinger: 0.60,
+        funding: 0.55, volume: 0.60, trend: 0.60, fearGreed: 0.20
+      },
+      '30m': {
+        rsi: 0.65, macd: 0.60, bollinger: 0.65,
+        funding: 0.50, volume: 0.55, trend: 0.70, fearGreed: 0.25
+      },
+      '1h': {
+        rsi: 0.65, macd: 0.60, bollinger: 0.60,
+        funding: 0.45, volume: 0.50, trend: 0.75, fearGreed: 0.30
+      }
+    },
+    confidenceThreshold: {
+      '5m': 0.70, '10m': 0.65, '30m': 0.60, '1h': 0.55
+    },
+    recentPerformance: {
+      '5m': [], '10m': [], '30m': [], '1h': []
+    }
+  },
+
+  // Expert #12: 패턴 학습 전문가 (Pattern Hunter)
+  {
+    id: 12,
+    name: '패턴 헌터',
+    strategy: '성공 패턴 학습 & 재현',
+    emoji: '🎯',
+    weights: {
+      '5m': {
+        rsi: 0.65, macd: 0.70, bollinger: 0.70,
+        funding: 0.60, volume: 0.75, trend: 0.50, fearGreed: 0.15
+      },
+      '10m': {
+        rsi: 0.70, macd: 0.70, bollinger: 0.70,
+        funding: 0.55, volume: 0.70, trend: 0.60, fearGreed: 0.20
+      },
+      '30m': {
+        rsi: 0.75, macd: 0.70, bollinger: 0.75,
+        funding: 0.50, volume: 0.65, trend: 0.70, fearGreed: 0.25
+      },
+      '1h': {
+        rsi: 0.75, macd: 0.70, bollinger: 0.70,
+        funding: 0.45, volume: 0.60, trend: 0.75, fearGreed: 0.30
+      }
+    },
+    confidenceThreshold: {
+      '5m': 0.65, '10m': 0.60, '30m': 0.55, '1h': 0.50
+    },
+    recentPerformance: {
+      '5m': [], '10m': [], '30m': [], '1h': []
+    }
+  },
+
+  // Expert #13: 역발상 전문가 (Contrarian Hunter)
+  {
+    id: 13,
+    name: '역발상 사냥꾼',
+    strategy: '군중심리 역이용',
+    emoji: '🦅',
+    weights: {
+      '5m': {
+        rsi: 0.75, macd: 0.50, bollinger: 0.80,
+        funding: 0.70, volume: 0.50, trend: 0.30, fearGreed: 0.90
+      },
+      '10m': {
+        rsi: 0.80, macd: 0.50, bollinger: 0.80,
+        funding: 0.65, volume: 0.50, trend: 0.35, fearGreed: 0.85
+      },
+      '30m': {
+        rsi: 0.85, macd: 0.50, bollinger: 0.75,
+        funding: 0.60, volume: 0.50, trend: 0.40, fearGreed: 0.80
+      },
+      '1h': {
+        rsi: 0.85, macd: 0.50, bollinger: 0.75,
+        funding: 0.55, volume: 0.50, trend: 0.45, fearGreed: 0.75
+      }
+    },
+    confidenceThreshold: {
+      '5m': 0.70, '10m': 0.65, '30m': 0.60, '1h': 0.55
+    },
+    recentPerformance: {
+      '5m': [], '10m': [], '30m': [], '1h': []
+    }
   }
 ];
 
@@ -330,7 +426,7 @@ export function getExpertProfile(expertId: number): ExpertProfile | undefined {
 }
 
 // 모든 전문가 ID 목록
-export const EXPERT_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+export const EXPERT_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 // 지원하는 타임프레임 목록
 export const TIMEFRAMES = ['5m', '10m', '30m', '1h', '6h', '12h', '24h'] as const;

@@ -4,7 +4,7 @@ import type { Env } from '../types';
 import { upbitService } from '../services/exchanges/upbit';
 import { generateTechnicalSignals } from '../services/ai/signals';
 import {
-  getAllExpertPredictions,
+  getAllExpertPredictionsWithAdvanced,
   verifyPrediction,
   calculateConsensus
 } from '../services/ai/predictions';
@@ -72,8 +72,9 @@ export async function runAILearning(env: Env): Promise<void> {
           }
         }
 
-        // 예측 생성
-        const predictions = getAllExpertPredictions(
+        // 예측 생성 (고급 전문가 포함)
+        const predictions = await getAllExpertPredictionsWithAdvanced(
+          env.DB,
           coin,
           timeframe,
           signals,
@@ -89,7 +90,7 @@ export async function runAILearning(env: Env): Promise<void> {
         // 컨센서스 계산 및 로그
         const consensus = calculateConsensus(predictions);
         console.log(
-          `📊 ${coin.toUpperCase()} ${timeframe} 컨센서스: ${consensus.signal.toUpperCase()} (${consensus.confidence.toFixed(0)}%) - L:${consensus.longCount} S:${consensus.shortCount} N:${consensus.neutralCount}`
+          `📊 ${coin.toUpperCase()} ${timeframe} 컨센서스: ${consensus.signal.toUpperCase()} (${consensus.confidence.toFixed(0)}%) - L:${consensus.longCount} S:${consensus.shortCount} N:${consensus.neutralCount} (전체 ${consensus.totalExperts}/13)`
         );
       }
     }

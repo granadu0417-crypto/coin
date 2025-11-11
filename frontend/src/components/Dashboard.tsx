@@ -157,7 +157,7 @@ export default function Dashboard() {
 
       {/* Footer */}
       <footer className="mt-8 py-4 border-t border-slate-800 text-center text-slate-500 text-xs">
-        <p>실시간 데이터 제공: Upbit, Bithumb · AI 분석: 10명의 전문가 (24/7 자동 학습)</p>
+        <p>실시간 데이터 제공: Upbit, Bithumb · AI 분석: 13명의 전문가 (24/7 자동 학습 + 고급 메타 AI)</p>
         <p className="mt-1">© 2025 암호화폐 분석 플랫폼. 투자 결정은 신중하게.</p>
       </footer>
     </div>
