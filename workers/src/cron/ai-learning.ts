@@ -52,8 +52,8 @@ export async function runAILearning(env: Env): Promise<void> {
     console.log(`💰 현재 가격: BTC $${btcCurrentPrice.toFixed(2)}, ETH $${ethCurrentPrice.toFixed(2)}`);
 
     // Step 2: 기술적 지표 계산
-    const btcSignals = generateTechnicalSignals(btcPrices, btcCurrentPrice);
-    const ethSignals = generateTechnicalSignals(ethPrices, ethCurrentPrice);
+    const btcSignals = await generateTechnicalSignals('BTC', btcPrices, btcCurrentPrice);
+    const ethSignals = await generateTechnicalSignals('ETH', ethPrices, ethCurrentPrice);
 
     // Step 3 & 4: 모든 타임프레임에 대해 예측 생성 및 저장
     for (const coin of COINS) {

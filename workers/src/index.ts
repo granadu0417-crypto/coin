@@ -999,7 +999,7 @@ app.get('/api/trading-arena/predictions/live', async (c) => {
 
     // 2. 기술적 지표 계산
     const { generateTechnicalSignals } = await import('./services/ai/signals');
-    const signals = generateTechnicalSignals(candles, currentPrice);
+    const signals = await generateTechnicalSignals(symbol, candles, currentPrice);
 
     // 3. 각 전문가별 예측 생성
     const { predictByExpert } = await import('./services/ai/predictions');

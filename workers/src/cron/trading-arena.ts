@@ -85,7 +85,7 @@ async function processCoin(
       // Fallback: Upbit API 사용
       const fallbackCandles = await upbitService.getCandles(symbol, 10, 100);
       const fallbackPrice = fallbackCandles[fallbackCandles.length - 1].close;
-      const signals = generateTechnicalSignals(fallbackCandles, fallbackPrice);
+      const signals = await generateTechnicalSignals(symbol, fallbackCandles, fallbackPrice);
 
       await checkAndClosePositions(env.DB, coin, fallbackPrice, signals);
       await checkAndEnterPositions(env.DB, coin, fallbackPrice, signals);
@@ -96,7 +96,7 @@ async function processCoin(
     console.log(`📈 ${coin.toUpperCase()} 캔들 개수: ${candles.length}개`);
 
     // 2. 기술적 지표 계산 (10분 타임프레임)
-    const signals = generateTechnicalSignals(candles, currentPrice);
+    const signals = await generateTechnicalSignals(symbol, candles, currentPrice);
 
     // 3. 열린 포지션 먼저 체크 (청산 로직)
     await checkAndClosePositions(env.DB, coin, currentPrice, signals);

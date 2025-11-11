@@ -1,6 +1,7 @@
 import type { ExchangeTicker, Price } from '../../types';
 
 const BINANCE_API = 'https://data-api.binance.vision/api/v3'; // Public data endpoint (no IP restrictions)
+const BINANCE_FUTURES_API = 'https://fapi.binance.com/fapi/v1'; // Futures API (무료)
 
 export class BinanceService {
   /**
@@ -83,6 +84,49 @@ export class BinanceService {
     }
 
     return tickers;
+  }
+
+  /**
+   * Get current funding rate from Binance Futures (무료 API)
+   * 펀딩비율: 롱/숏 포지션 비율을 나타냄
+   * - 양수(+): 롱 포지션이 많음 → 숏 신호
+   * - 음수(-): 숏 포지션이 많음 → 롱 신호
+   */
+  async getFundingRate(symbol: string): Promise<{
+    fundingRate: number;
+    fundingTime: number;
+    markPrice: number;
+  }> {
+    try {
+      const response = await fetch(
+        `${BINANCE_FUTURES_API}/premiumIndex?symbol=${symbol}USDT`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; CryptoAnalysisBot/1.0)',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Binance Futures API error: ${response.statusText}`);
+      }
+
+      const data = await response.json<any>();
+
+      return {
+        fundingRate: parseFloat(data.lastFundingRate), // 현재 펀딩비율
+        fundingTime: parseInt(data.nextFundingTime), // 다음 펀딩 시간
+        markPrice: parseFloat(data.markPrice), // Mark Price
+      };
+    } catch (error) {
+      console.error(`Error fetching funding rate for ${symbol}:`, error);
+      // 에러 시 중립 반환
+      return {
+        fundingRate: 0,
+        fundingTime: 0,
+        markPrice: 0,
+      };
+    }
   }
 }
 
