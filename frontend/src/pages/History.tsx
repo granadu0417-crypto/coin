@@ -26,6 +26,23 @@ const formatToKST = (utcTimeStr: string, format: 'full' | 'short' = 'full') => {
   });
 };
 
+// 원화 포맷팅 함수
+const formatKRW = (amount: number): string => {
+  const absAmount = Math.abs(amount);
+  const sign = amount >= 0 ? '+' : '-';
+
+  if (absAmount >= 100000000) {
+    // 1억 이상: "억" 단위
+    return `${sign}${(absAmount / 100000000).toFixed(2)}억원`;
+  } else if (absAmount >= 10000) {
+    // 1만 이상: "만" 단위
+    return `${sign}${(absAmount / 10000).toFixed(1)}만원`;
+  } else {
+    // 1만 미만: 그대로 표시
+    return `${sign}${absAmount.toLocaleString('ko-KR')}원`;
+  }
+};
+
 export default function History() {
   const [coin, setCoin] = useState<'btc' | 'eth'>('btc');
   const [selectedExpert, setSelectedExpert] = useState<number | undefined>(undefined);
@@ -200,6 +217,9 @@ export default function History() {
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">📈 트레이딩 히스토리</h1>
             <p className="text-slate-400">누적 성과와 거래 내역을 확인하세요</p>
+            <p className="text-xs text-slate-500 mt-1">
+              💡 각 모델의 초기 원금: <span className="font-bold text-yellow-400">10,000,000원</span> (천만원)
+            </p>
           </div>
 
           {/* 필터 */}
@@ -258,7 +278,7 @@ export default function History() {
               <YAxis
                 stroke="#94a3b8"
                 style={{ fontSize: '12px' }}
-                tickFormatter={(value) => `$${(value / 1000).toFixed(1)}K`}
+                tickFormatter={(value) => formatKRW(value)}
               />
               <Tooltip
                 contentStyle={{
@@ -414,7 +434,7 @@ export default function History() {
                           </h3>
                           <p className="text-slate-400 text-sm mt-1">
                             총 {totalTrades}건 거래 • 전체 수익: <span className={totalProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
-                              {totalProfit >= 0 ? '+' : ''}${(totalProfit / 1000).toFixed(1)}K
+                              {formatKRW(totalProfit)}
                             </span>
                           </p>
                         </div>
@@ -490,10 +510,10 @@ export default function History() {
                                       <span className="text-slate-500">-</span>
                                     )}
                                   </td>
-                                  <td className={`py-3 text-right font-bold text-lg ${
+                                  <td className={`py-3 text-right font-bold text-sm ${
                                     hasData ? (stat.totalProfit >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'
                                   }`}>
-                                    {hasData ? `${stat.totalProfit >= 0 ? '+' : ''}$${(stat.totalProfit / 1000).toFixed(1)}K` : '-'}
+                                    {hasData ? formatKRW(stat.totalProfit) : '-'}
                                   </td>
                                   <td className={`py-3 text-right font-semibold ${
                                     hasData ? (stat.avgProfitPercent >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'
@@ -536,7 +556,7 @@ export default function History() {
                       <th className="pb-4 text-base font-bold">모델</th>
                       <th className="pb-4 text-center text-base font-bold">거래수</th>
                       <th className="pb-4 text-center text-base font-bold">승률</th>
-                      <th className="pb-4 text-right text-base font-bold">💰 총 수익금</th>
+                      <th className="pb-4 text-right text-base font-bold">💰 총 수익금 (원금 대비)</th>
                       <th className="pb-4 text-center text-base font-bold">승/패</th>
                       <th className="pb-4 text-right text-sm">최고의 날</th>
                       <th className="pb-4 text-right text-sm">최악의 날</th>
@@ -568,10 +588,17 @@ export default function History() {
                             {model.winRate.toFixed(1)}%
                           </span>
                         </td>
-                        <td className={`py-4 text-right font-black text-2xl ${
+                        <td className={`py-4 text-right ${
                           model.totalProfitAmount >= 0 ? 'text-green-400' : 'text-red-400'
                         }`}>
-                          {model.totalProfitAmount >= 0 ? '+' : ''}${(model.totalProfitAmount / 1000000).toFixed(2)}M
+                          <div className="font-black text-xl">
+                            {formatKRW(model.totalProfitAmount)}
+                          </div>
+                          <div className={`text-sm font-bold mt-1 ${
+                            model.totalProfitAmount >= 0 ? 'text-green-300' : 'text-red-300'
+                          }`}>
+                            ({model.totalProfitAmount >= 0 ? '+' : ''}{((model.totalProfitAmount / 10000000) * 100).toFixed(2)}%)
+                          </div>
                         </td>
                         <td className="py-4 text-center text-base">
                           <span className="text-green-400 font-bold">{model.totalWins}</span>
@@ -581,8 +608,8 @@ export default function History() {
                         <td className="py-4 text-right">
                           {model.bestDay && (
                             <div>
-                              <div className="text-green-400 font-bold text-base">
-                                +${(model.bestDay.totalProfit / 1000).toFixed(1)}K
+                              <div className="text-green-400 font-bold text-sm">
+                                {formatKRW(model.bestDay.totalProfit)}
                               </div>
                               <div className="text-slate-500 text-xs mt-0.5">
                                 {new Date(model.bestDay.date.endsWith('Z') ? model.bestDay.date : `${model.bestDay.date}Z`).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' })}
@@ -593,8 +620,8 @@ export default function History() {
                         <td className="py-4 text-right">
                           {model.worstDay && (
                             <div>
-                              <div className="text-red-400 font-bold text-base">
-                                ${(model.worstDay.totalProfit / 1000).toFixed(1)}K
+                              <div className="text-red-400 font-bold text-sm">
+                                {formatKRW(model.worstDay.totalProfit)}
                               </div>
                               <div className="text-slate-500 text-xs mt-0.5">
                                 {new Date(model.worstDay.date.endsWith('Z') ? model.worstDay.date : `${model.worstDay.date}Z`).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' })}
@@ -640,7 +667,6 @@ export default function History() {
                               );
                             }
                             const profit = dayStat.totalProfit;
-                            const profitK = profit / 1000;
                             const bgColor = profit > 1000000 ? 'bg-green-500/50 border-2 border-green-400 text-green-200' :
                                            profit > 0 ? 'bg-green-500/30 border border-green-500/50 text-green-300' :
                                            profit > -1000000 ? 'bg-red-500/30 border border-red-500/50 text-red-300' :
@@ -648,8 +674,8 @@ export default function History() {
                             return (
                               <td key={date} className="py-3 px-3 text-center">
                                 <div className={`rounded-lg px-3 py-2 font-bold ${bgColor}`}>
-                                  <div className="text-base">
-                                    {profit >= 0 ? '+' : ''}{profitK >= 1000 || profitK <= -1000 ? `$${(profitK / 1000).toFixed(1)}M` : `$${profitK.toFixed(0)}K`}
+                                  <div className="text-sm">
+                                    {formatKRW(profit)}
                                   </div>
                                   <div className="text-xs opacity-75 mt-0.5">
                                     {dayStat.avgProfitPercent >= 0 ? '+' : ''}{dayStat.avgProfitPercent.toFixed(1)}%
