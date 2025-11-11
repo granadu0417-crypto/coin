@@ -19,6 +19,7 @@ import {
 } from '../services/ai/database';
 import { learnFromResult, calculateIndicatorImportance } from '../services/ai/learning';
 import { EXPERT_IDS, TIMEFRAMES, COINS } from '../services/ai/experts';
+import { getVerificationTime } from '../services/ai/constants';
 import type { IndicatorImportance } from '../types/ai';
 
 /**
@@ -29,9 +30,9 @@ import type { IndicatorImportance } from '../types/ai';
  * 실행 단계:
  * 1. BTC/ETH 현재 가격 및 과거 데이터 가져오기
  * 2. 기술적 지표 계산
- * 3. 모든 타임프레임(5m, 10m, 30m, 1h)에 대해 예측 생성
+ * 3. 모든 타임프레임(5m, 10m, 30m, 1h, 6h, 12h, 24h)에 대해 예측 생성
  * 4. D1에 예측 저장
- * 5. 30초 이상 경과한 예측 검증
+ * 5. 타임프레임별 검증 시간 경과한 예측 검증 (5m:30s, 10m:1m, 30m:2m, 1h:3m, 6h:15m, 12h:30m, 24h:1h)
  * 6. 검증 결과에 따라 학습
  * 7. D1에 전문가 가중치 및 통계 업데이트
  */
@@ -93,11 +94,20 @@ export async function runAILearning(env: Env): Promise<void> {
       }
     }
 
-    // Step 5: 30초 이상 경과한 예측 검증
-    const pendingPredictions = await getPendingPredictions(env.DB, 30);
-    console.log(`🔍 검증 대상: ${pendingPredictions.length}개 예측`);
+    // Step 5: 타임프레임별 검증 시간 경과한 예측 검증
+    const allPendingPredictions = await getPendingPredictions(env.DB, 0);
 
-    for (const prediction of pendingPredictions) {
+    // 각 예측의 타임프레임에 맞는 검증 시간이 지났는지 필터링
+    const now = Date.now();
+    const readyPredictions = allPendingPredictions.filter(prediction => {
+      const verificationTime = getVerificationTime(prediction.timeframe);
+      const elapsedSeconds = (now - prediction.createdAt.getTime()) / 1000;
+      return elapsedSeconds >= verificationTime;
+    });
+
+    console.log(`🔍 검증 대상: ${readyPredictions.length}개 예측 (전체 대기: ${allPendingPredictions.length}개)`);
+
+    for (const prediction of readyPredictions) {
       // 현재 가격 가져오기
       const symbol = prediction.coin === 'btc' ? 'BTC' : 'ETH';
       const ticker = await upbitService.getTicker(symbol);

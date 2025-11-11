@@ -60,6 +60,11 @@ export default function PredictionsList({ predictions }: PredictionsListProps) {
     <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-slate-700 shadow-xl hover:shadow-2xl transition-shadow">
       <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
         🎯 <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">개별 전문가 예측</span>
+        {predictions.length > 0 && (
+          <span className="ml-2 px-2 py-0.5 bg-blue-500/20 border border-blue-500/50 rounded text-blue-400 text-xs font-bold">
+            {predictions[0].symbol}
+          </span>
+        )}
       </h3>
 
       <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">

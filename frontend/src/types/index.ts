@@ -60,3 +60,115 @@ export interface HealthStatus {
   database?: string;
   redis?: string;
 }
+
+// Trading Recommendation Types
+export type TradeAction = 'strong_buy' | 'buy' | 'cautious' | 'wait' | 'avoid';
+export type Signal = 'long' | 'short' | 'neutral';
+
+export interface TradingRecommendation {
+  action: TradeAction;
+  actionKr: string;
+  emoji: string;
+  color: string;
+  description: string;
+}
+
+export interface ExpertPrediction {
+  expertId: number;
+  expertName: string;
+  expertEmoji: string;
+  signal: Signal;
+  confidence: number;
+  winRate: number;
+}
+
+export interface TopModel {
+  expertId: number;
+  expertName: string;
+  expertEmoji: string;
+  winRate: number;
+  signal: Signal;
+}
+
+export interface ConsensusInfo {
+  signal: Signal;
+  confidence: number;
+  weightedLongScore: number;
+  weightedShortScore: number;
+}
+
+export interface TradingStats {
+  recentSuccessRate: number;
+  signalAgeMinutes: number;
+  totalPredictions: number;
+  top3Models: TopModel[];
+}
+
+export interface TradingRecommendationResponse {
+  hasData: boolean;
+  coin: string;
+  timeframe: string;
+  timestamp: string;
+  signalStrength: number;
+  recommendation: TradingRecommendation;
+  consensus: ConsensusInfo;
+  stats: TradingStats;
+  predictions: ExpertPrediction[];
+  error?: string;
+}
+
+// Trading Arena Types
+export interface TraderBalance {
+  expertId: number;
+  name: string;
+  emoji: string;
+  strategy: string;
+  currentBalance: number;
+  initialBalance: number;
+  todayProfitPercent: number;
+  todayProfitAmount: number;
+  todayTrades: number;
+  todayWins: number;
+  todayLosses: number;
+  totalTrades: number;
+  winRate: number;
+  totalProfitPercent: number;
+  bestTradePercent: number;
+  worstTradePercent: number;
+  consecutiveWins: number;
+  consecutiveLosses: number;
+  status: string;
+}
+
+export interface OpenPosition {
+  id: number;
+  expertId: number;
+  expertName: string;
+  expertEmoji: string;
+  coin: string;
+  position: 'long' | 'short';
+  entryTime: string;
+  entryPrice: number;
+  entryConfidence: number;
+  balanceBefore: number;
+}
+
+export interface ClosedTrade {
+  id: number;
+  expertId: number;
+  expertName: string;
+  expertEmoji: string;
+  coin: string;
+  position: 'long' | 'short';
+  entryTime: string;
+  entryPrice: number;
+  exitTime: string;
+  exitPrice: number;
+  exitReason: string;
+  holdDurationMinutes: number;
+  leveragedProfitPercent: number;
+  profitAmount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  status: string;
+}

@@ -21,6 +21,15 @@ id = "14e67312062e4a8c8fa293f1d8b077f7"
 [ai]
 binding = "AI"
 
+# Durable Objects for real-time candle building
+[[durable_objects.bindings]]
+name = "CANDLE_BUILDER"
+class_name = "CandleBuilderDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CandleBuilderDO"]
+
 # Scheduled triggers (Cron)
 [triggers]
 crons = [

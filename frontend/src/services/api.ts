@@ -105,4 +105,71 @@ export const influencerApi = {
   },
 };
 
+export const tradingApi = {
+  getRecommendation: async (coin: 'btc' | 'eth'): Promise<import('../types').TradingRecommendationResponse> => {
+    const response = await api.get('/api/ai/trading-recommendation', {
+      params: { coin },
+    });
+    return response.data;
+  },
+};
+
+export const arenaApi = {
+  getLeaderboard: async (coin: 'btc' | 'eth') => {
+    const response = await api.get('/api/trading-arena/leaderboard', {
+      params: { coin },
+    });
+    return response.data;
+  },
+
+  getOpenPositions: async (coin?: 'btc' | 'eth') => {
+    const response = await api.get('/api/trading-arena/positions/open', {
+      params: coin ? { coin } : {},
+    });
+    return response.data;
+  },
+
+  getRecentTrades: async (coin?: 'btc' | 'eth', limit: number = 50) => {
+    const response = await api.get('/api/trading-arena/trades/recent', {
+      params: { coin, limit },
+    });
+    return response.data;
+  },
+
+  getTraderStats: async (expertId: number, coin: 'btc' | 'eth') => {
+    const response = await api.get(`/api/trading-arena/trader/${expertId}`, {
+      params: { coin },
+    });
+    return response.data;
+  },
+
+  getDailyStats: async (coin: 'btc' | 'eth', startDate?: string, endDate?: string) => {
+    const response = await api.get('/api/trading-arena/history/daily-stats', {
+      params: { coin, startDate, endDate },
+    });
+    return response.data;
+  },
+
+  getPerformance: async (coin: 'btc' | 'eth', expertId?: number) => {
+    const response = await api.get('/api/trading-arena/history/performance', {
+      params: { coin, expertId },
+    });
+    return response.data;
+  },
+
+  getAllTrades: async (coin?: 'btc' | 'eth', expertId?: number, page: number = 1, limit: number = 100, startDate?: string, endDate?: string) => {
+    const response = await api.get('/api/trading-arena/history/all-trades', {
+      params: { coin, expertId, page, limit, startDate, endDate },
+    });
+    return response.data;
+  },
+
+  getLivePredictions: async (coin: 'btc' | 'eth') => {
+    const response = await api.get('/api/trading-arena/predictions/live', {
+      params: { coin },
+    });
+    return response.data;
+  },
+};
+
 export default api;

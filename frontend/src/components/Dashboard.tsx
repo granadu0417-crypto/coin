@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { pricesApi, predictionsApi, influencerApi } from '../services/api';
+import { useUpbitWebSocket } from '../hooks/useUpbitWebSocket';
 import PriceCard from './PriceCard';
 import ConsensusView from './ConsensusView';
 import PredictionsList from './PredictionsList';
 import InfluencerTimeline from './InfluencerTimeline';
 import ExpertsStats from './ExpertsStats';
+import LivePredictions from './LivePredictions';
+import PredictionHistory from './PredictionHistory';
+import TradingAssistant from './TradingAssistant';
+import type { Price } from '../types';
 
 const TRACKED_COINS = [
   { symbol: 'BTC', name: 'Bitcoin', emoji: '₿' },
@@ -15,12 +20,27 @@ const TRACKED_COINS = [
 export default function Dashboard() {
   const [selectedCoin, setSelectedCoin] = useState('BTC');
 
-  const { data: latestPrice } = useQuery({
-    queryKey: ['price', selectedCoin],
-    queryFn: () => pricesApi.getLatest(selectedCoin),
-    refetchInterval: 5000, // Refresh every 5 seconds
-  });
+  // 🚀 실시간 가격 업데이트 (WebSocket)
+  const realtimePrice = useUpbitWebSocket(selectedCoin);
 
+  // Price 타입으로 변환
+  const latestPrice: Price | null = useMemo(() => {
+    if (!realtimePrice) return null;
+
+    return {
+      symbol: realtimePrice.symbol,
+      exchange: 'upbit',
+      price: realtimePrice.price,
+      open: realtimePrice.price, // WebSocket에서는 없으므로 현재가로 대체
+      high: realtimePrice.high24h,
+      low: realtimePrice.low24h,
+      close: realtimePrice.price,
+      volume: realtimePrice.volume24h,
+      timestamp: Math.floor(realtimePrice.timestamp / 1000), // milliseconds → seconds
+    };
+  }, [realtimePrice]);
+
+  // 차트용 히스토리 데이터 (HTTP - 1분마다)
   const { data: priceHistory } = useQuery({
     queryKey: ['priceHistory', selectedCoin],
     queryFn: () => pricesApi.getHistory(selectedCoin, 'upbit', 24),
@@ -90,10 +110,16 @@ export default function Dashboard() {
               <PriceCard price={latestPrice} history={priceHistory || []} />
             )}
 
+            {/* Trading Assistant - Smart Buy/Wait Recommendation */}
+            <TradingAssistant coin={selectedCoin.toLowerCase() as 'btc' | 'eth'} />
+
             {/* Consensus View */}
             {consensus && (
               <ConsensusView consensus={consensus} />
             )}
+
+            {/* Live Predictions - All Timeframes */}
+            <LivePredictions coin={selectedCoin.toLowerCase() as 'btc' | 'eth'} />
 
             {/* Predictions List */}
             {predictions && predictions.length > 0 ? (
@@ -120,7 +146,12 @@ export default function Dashboard() {
 
         {/* Full Width: AI Experts Stats (24/7 Learning) */}
         <div className="mt-6">
-          <ExpertsStats />
+          <ExpertsStats coin={selectedCoin.toLowerCase() as 'btc' | 'eth'} />
+        </div>
+
+        {/* Full Width: Prediction History */}
+        <div className="mt-6">
+          <PredictionHistory coin={selectedCoin.toLowerCase() as 'btc' | 'eth'} />
         </div>
       </main>
 

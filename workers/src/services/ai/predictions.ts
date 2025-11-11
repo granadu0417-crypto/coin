@@ -6,7 +6,8 @@ import type {
   TechnicalSignals,
   IndicatorContributions,
   IndicatorImportance,
-  IndicatorWeights
+  IndicatorWeights,
+  Timeframe
 } from '../../types/ai';
 import { getExpertProfile, EXPERT_IDS } from './experts';
 import { applyIndicatorImportance } from './learning';
@@ -27,7 +28,7 @@ import { applyIndicatorImportance } from './learning';
 export function predictByExpert(
   expertId: number,
   coin: 'btc' | 'eth',
-  timeframe: '5m' | '10m' | '30m' | '1h',
+  timeframe: Timeframe,
   signals: TechnicalSignals,
   currentPrice: number,
   indicatorImportance?: IndicatorImportance | null
@@ -38,8 +39,8 @@ export function predictByExpert(
     return null;
   }
 
-  // Phase 1-1: 타임프레임별 가중치 사용
-  const baseWeights = expert.weights[timeframe];
+  // Phase 1-1: 타임프레임별 가중치 사용 (없으면 1h 가중치 사용)
+  const baseWeights = expert.weights[timeframe] || expert.weights['1h'] || expert.weights['5m'];
 
   // Phase 2-3: 실시간 지표 중요도 반영
   const weights = applyIndicatorImportance(baseWeights, indicatorImportance);
@@ -93,8 +94,8 @@ export function predictByExpert(
     confidence = 0;
   }
 
-  // Phase 2-1: 신뢰도 임계값 필터링
-  const threshold = expert.confidenceThreshold[timeframe];
+  // Phase 2-1: 신뢰도 임계값 필터링 (없으면 1h 임계값 사용)
+  const threshold = expert.confidenceThreshold[timeframe] || expert.confidenceThreshold['1h'] || 0.40;
   const confidenceDecimal = confidence / 100;
 
   if (confidenceDecimal < threshold) {
@@ -137,7 +138,7 @@ export function predictByExpert(
  */
 export function getAllExpertPredictions(
   coin: 'btc' | 'eth',
-  timeframe: '5m' | '10m' | '30m' | '1h',
+  timeframe: Timeframe,
   signals: TechnicalSignals,
   currentPrice: number,
   importanceMap?: Map<number, IndicatorImportance>
@@ -168,10 +169,14 @@ export function getAllExpertPredictions(
 }
 
 /**
- * 예측 검증 (30초 후 가격과 비교)
+ * 예측 검증 (타임프레임 후 가격과 비교)
+ *
+ * 레버리지 20배 기준 최소 5% 수익률 달성 시 성공
+ * - 실제 가격 변동 0.25% = 레버리지 수익 5%
+ * - 실제 가격 변동 0.5% = 레버리지 수익 10%
  *
  * @param prediction 예측 객체
- * @param exitPrice 30초 후 가격
+ * @param exitPrice 검증 시점 가격
  * @returns 업데이트된 예측 객체
  */
 export function verifyPrediction(prediction: Prediction, exitPrice: number): Prediction {
@@ -180,14 +185,22 @@ export function verifyPrediction(prediction: Prediction, exitPrice: number): Pre
   prediction.exitPrice = exitPrice;
   prediction.checkedAt = new Date();
 
-  // 수익률 계산
-  const profitPercent = ((exitPrice - entryPrice) / entryPrice) * 100;
-  prediction.profitPercent = profitPercent;
+  // 실제 가격 변동률 계산
+  const priceChangePercent = ((exitPrice - entryPrice) / entryPrice) * 100;
 
-  // 성공 여부 판단
-  if (signal === 'long' && profitPercent > 0) {
+  // 레버리지 20배 적용 수익률 계산
+  const LEVERAGE = 20;
+  const MIN_PROFIT_PERCENT = 5; // 최소 5% 수익률
+
+  const leveragedProfit = priceChangePercent * LEVERAGE;
+  prediction.profitPercent = leveragedProfit;
+
+  // 성공 여부 판단 (레버리지 기준 최소 5% 수익)
+  if (signal === 'long' && leveragedProfit >= MIN_PROFIT_PERCENT) {
+    // 롱 포지션: 가격 상승 시 수익 (레버리지 수익 5% 이상)
     prediction.status = 'success';
-  } else if (signal === 'short' && profitPercent < 0) {
+  } else if (signal === 'short' && leveragedProfit <= -MIN_PROFIT_PERCENT) {
+    // 숏 포지션: 가격 하락 시 수익 (레버리지 수익 5% 이상, 음수로 표현)
     prediction.status = 'success';
   } else if (signal === 'neutral') {
     // neutral은 항상 성공으로 간주 (예측 거부)
@@ -198,7 +211,7 @@ export function verifyPrediction(prediction: Prediction, exitPrice: number): Pre
 
   console.log(
     `${prediction.status === 'success' ? '✅' : '❌'} 전문가 #${prediction.expertId} (${prediction.timeframe}):`,
-    `${signal.toUpperCase()} ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%`
+    `${signal.toUpperCase()} 실제=${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(3)}% x20 = ${leveragedProfit > 0 ? '+' : ''}${leveragedProfit.toFixed(2)}%`
   );
 
   return prediction;
@@ -249,4 +262,174 @@ export function calculateConsensus(predictions: Prediction[]): {
     neutralCount,
     totalExperts
   };
+}
+
+/**
+ * 가중치 컨센서스 계산 (최근 성과 기반)
+ *
+ * @param predictions 예측 배열
+ * @param expertStats 전문가별 최근 성과 (승률)
+ * @returns 가중치 적용된 컨센서스
+ */
+export function calculateWeightedConsensus(
+  predictions: Prediction[],
+  expertStats: Map<number, number> // expertId -> 최근 승률 (0-100)
+): {
+  signal: 'long' | 'short' | 'neutral';
+  confidence: number;
+  weightedLongScore: number;
+  weightedShortScore: number;
+  weightedNeutralScore: number;
+} {
+  let weightedLongScore = 0;
+  let weightedShortScore = 0;
+  let weightedNeutralScore = 0;
+  let totalWeight = 0;
+
+  for (const pred of predictions) {
+    // 승률을 가중치로 사용 (기본값 50%)
+    const weight = expertStats.get(pred.expertId) || 50;
+
+    if (pred.signal === 'long') {
+      weightedLongScore += weight;
+    } else if (pred.signal === 'short') {
+      weightedShortScore += weight;
+    } else {
+      weightedNeutralScore += weight;
+    }
+
+    totalWeight += weight;
+  }
+
+  // 백분율로 변환
+  const longPercent = totalWeight > 0 ? (weightedLongScore / totalWeight) * 100 : 0;
+  const shortPercent = totalWeight > 0 ? (weightedShortScore / totalWeight) * 100 : 0;
+  const neutralPercent = totalWeight > 0 ? (weightedNeutralScore / totalWeight) * 100 : 0;
+
+  let signal: 'long' | 'short' | 'neutral';
+  let confidence: number;
+
+  if (longPercent > shortPercent && longPercent > neutralPercent) {
+    signal = 'long';
+    confidence = longPercent;
+  } else if (shortPercent > longPercent && shortPercent > neutralPercent) {
+    signal = 'short';
+    confidence = shortPercent;
+  } else {
+    signal = 'neutral';
+    confidence = neutralPercent;
+  }
+
+  return {
+    signal,
+    confidence,
+    weightedLongScore,
+    weightedShortScore,
+    weightedNeutralScore
+  };
+}
+
+/**
+ * 신호 강도 점수 계산 (0-100)
+ *
+ * 계산 방식:
+ * - 컨센서스 일치도 (40%)
+ * - 상위 3개 모델 평균 승률 (30%)
+ * - 최근 1시간 성과 (20%)
+ * - 신호 신선도 (10%)
+ */
+export function calculateSignalStrength(
+  predictions: Prediction[],
+  expertStats: Map<number, number>, // expertId -> 최근 승률
+  recentSuccessRate: number, // 최근 1시간 전체 승률 (0-100)
+  signalAgeMinutes: number // 신호 생성 후 경과 시간 (분)
+): number {
+  // 1. 컨센서스 일치도 (40%)
+  const consensus = calculateWeightedConsensus(predictions, expertStats);
+  const consensusScore = consensus.confidence; // 이미 0-100
+
+  // 2. 상위 3개 모델 평균 승률 (30%)
+  const sortedStats = Array.from(expertStats.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  const top3AvgRate = sortedStats.length > 0
+    ? sortedStats.reduce((sum, [_, rate]) => sum + rate, 0) / sortedStats.length
+    : 50;
+
+  // 3. 최근 1시간 성과 (20%)
+  const recentScore = recentSuccessRate; // 이미 0-100
+
+  // 4. 신호 신선도 (10%)
+  let freshnessScore: number;
+  if (signalAgeMinutes <= 2) {
+    freshnessScore = 100; // Fresh
+  } else if (signalAgeMinutes <= 5) {
+    freshnessScore = 75; // Good
+  } else if (signalAgeMinutes <= 10) {
+    freshnessScore = 50; // Old
+  } else {
+    freshnessScore = 25; // Stale
+  }
+
+  // 최종 점수 계산
+  const finalScore =
+    (consensusScore * 0.4) +
+    (top3AvgRate * 0.3) +
+    (recentScore * 0.2) +
+    (freshnessScore * 0.1);
+
+  return Math.round(finalScore);
+}
+
+/**
+ * 매수/대기 추천 결정
+ */
+export function getTradingRecommendation(signalStrength: number): {
+  action: 'strong_buy' | 'buy' | 'cautious' | 'wait' | 'avoid';
+  actionKr: string;
+  emoji: string;
+  color: string;
+  description: string;
+} {
+  if (signalStrength >= 90) {
+    return {
+      action: 'strong_buy',
+      actionKr: '강력 매수 추천',
+      emoji: '🔥',
+      color: 'text-green-400 bg-green-500/20 border-green-500/50',
+      description: '최고 수준의 신호입니다. 적극 매수를 고려하세요.'
+    };
+  } else if (signalStrength >= 75) {
+    return {
+      action: 'buy',
+      actionKr: '매수 추천',
+      emoji: '✅',
+      color: 'text-green-400 bg-green-500/20 border-green-500/30',
+      description: '좋은 신호입니다. 매수를 고려하세요.'
+    };
+  } else if (signalStrength >= 60) {
+    return {
+      action: 'cautious',
+      actionKr: '신중 매수',
+      emoji: '⚠️',
+      color: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/50',
+      description: '중간 수준의 신호입니다. 신중하게 매수하세요.'
+    };
+  } else if (signalStrength >= 40) {
+    return {
+      action: 'wait',
+      actionKr: '대기 권장',
+      emoji: '⏸️',
+      color: 'text-slate-400 bg-slate-500/20 border-slate-500/50',
+      description: '확실한 신호가 아닙니다. 대기를 권장합니다.'
+    };
+  } else {
+    return {
+      action: 'avoid',
+      actionKr: '매수 비추천',
+      emoji: '❌',
+      color: 'text-red-400 bg-red-500/20 border-red-500/50',
+      description: '약한 신호입니다. 매수를 피하세요.'
+    };
+  }
 }

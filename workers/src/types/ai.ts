@@ -10,26 +10,19 @@ export interface IndicatorWeights {
   fearGreed: number;
 }
 
-export interface TimeframeWeights {
-  '5m': IndicatorWeights;
-  '10m': IndicatorWeights;
-  '30m': IndicatorWeights;
-  '1h': IndicatorWeights;
-}
+export type Timeframe = '5m' | '10m' | '30m' | '1h' | '6h' | '12h' | '24h';
 
-export interface ConfidenceThreshold {
-  '5m': number;
-  '10m': number;
-  '30m': number;
-  '1h': number;
-}
+export type TimeframeWeights = {
+  [K in Timeframe]?: IndicatorWeights;
+};
 
-export interface RecentPerformance {
-  '5m': boolean[];
-  '10m': boolean[];
-  '30m': boolean[];
-  '1h': boolean[];
-}
+export type ConfidenceThreshold = {
+  [K in Timeframe]?: number;
+};
+
+export type RecentPerformance = {
+  [K in Timeframe]?: boolean[];
+};
 
 export interface ExpertProfile {
   id: number;
@@ -56,7 +49,7 @@ export interface Prediction {
   id?: number;
   expertId: number;
   coin: 'btc' | 'eth';
-  timeframe: '5m' | '10m' | '30m' | '1h';
+  timeframe: Timeframe;
   signal: 'long' | 'short' | 'neutral';
   confidence: number;
   entryPrice: number;
@@ -70,12 +63,52 @@ export interface Prediction {
 
 export interface ExpertStats {
   expertId: number;
-  timeframe: '5m' | '10m' | '30m' | '1h';
+  timeframe: Timeframe;
   totalPredictions: number;
   successCount: number;
   failCount: number;
   pendingCount: number;
   successRate: number;
+  lastUpdated: Date;
+}
+
+// 전문가 상세 통계 (투자 판단용)
+export interface DetailedExpertStats {
+  expertId: number;
+  expertName: string;
+  expertEmoji: string;
+  expertStrategy: string;
+  coin: 'btc' | 'eth';
+  timeframe?: Timeframe; // optional: 전체 통계 시 undefined
+
+  // 기본 통계
+  totalPredictions: number;
+  successCount: number;
+  failCount: number;
+  pendingCount: number;
+  successRate: number;
+
+  // 수익률 통계 (레버리지 20배 기준)
+  avgProfit: number;
+  maxProfit: number;
+  maxLoss: number;
+  totalProfit: number;
+
+  // 연속 기록
+  currentStreak: number; // 현재 연속 (양수: 성공, 음수: 실패)
+  maxWinStreak: number;
+  maxLossStreak: number;
+
+  // 신호별 통계
+  longCount: number;
+  shortCount: number;
+  neutralCount: number;
+  longSuccessRate: number;
+  shortSuccessRate: number;
+
+  // 최근 성과 (최근 10개)
+  recentResults: boolean[]; // true: success, false: fail
+
   lastUpdated: Date;
 }
 

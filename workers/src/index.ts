@@ -11,14 +11,24 @@ import { rssAggregator } from './services/rss/aggregator';
 
 // Import cron handlers
 import { handleScheduled as handleAILearning } from './cron/ai-learning';
+import { runTradingArena } from './cron/trading-arena';
+
+// Trading Arena handler wrapper
+async function handleTradingArena(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+  ctx.waitUntil(runTradingArena(env));
+}
 
 // Import AI services
 import {
   getAllExpertStats,
   getExpertStats,
-  loadExpertProfile
+  loadExpertProfile,
+  getDetailedExpertStats
 } from './services/ai/database';
 import { expertProfiles } from './services/ai/experts';
+
+// Export Durable Objects
+export { CandleBuilderDO } from './durable-objects/candle-builder-do';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -356,6 +366,178 @@ app.get('/api/ai/experts', async (c) => {
   }
 });
 
+// Get detailed expert stats (투자 판단용)
+app.get('/api/ai/experts/stats', async (c) => {
+  const coin = (c.req.query('coin') || 'btc') as 'btc' | 'eth';
+  const expertIdParam = c.req.query('expertId');
+  const timeframeParam = c.req.query('timeframe');
+
+  const expertId = expertIdParam ? parseInt(expertIdParam) : undefined;
+  const timeframe = timeframeParam as any; // Timeframe type
+
+  try {
+    const stats = await getDetailedExpertStats(
+      c.env.DB,
+      coin,
+      expertId,
+      timeframe
+    );
+
+    return c.json({
+      coin,
+      timeframe: timeframe || 'all',
+      expertId: expertId || 'all',
+      stats,
+      count: stats.length
+    });
+  } catch (error: any) {
+    console.error('❌ 전문가 상세 통계 조회 실패:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get trading recommendation (실시간 매수/대기 추천)
+app.get('/api/ai/trading-recommendation', async (c) => {
+  const coin = (c.req.query('coin') || 'btc') as 'btc' | 'eth';
+  const timeframe = '10m'; // 10분 타임프레임으로 통일
+
+  try {
+    // 1. Import 필요한 함수들
+    const {
+      calculateWeightedConsensus,
+      calculateSignalStrength,
+      getTradingRecommendation
+    } = await import('./services/ai/predictions');
+
+    const {
+      getRecentWinRates,
+      getRecentOverallSuccessRate
+    } = await import('./services/ai/database');
+
+    // 2. 최근 10분 예측 가져오기
+    const recentPredictions = await c.env.DB
+      .prepare(`
+        SELECT p.*, e.name, e.emoji, e.strategy
+        FROM predictions p
+        JOIN expert_profiles e ON p.expert_id = e.id
+        WHERE p.coin = ? AND p.timeframe = ? AND p.status = 'pending'
+        ORDER BY p.created_at DESC
+        LIMIT 10
+      `)
+      .bind(coin, timeframe)
+      .all();
+
+    if (!recentPredictions.results || recentPredictions.results.length === 0) {
+      return c.json({
+        error: '현재 예측이 없습니다. 잠시 후 다시 시도해주세요.',
+        hasData: false
+      });
+    }
+
+    // 3. 전문가별 최근 승률 계산
+    const expertWinRates = await getRecentWinRates(c.env.DB, coin, timeframe, 20);
+
+    // 4. 최근 1시간 전체 승률 계산
+    const recentSuccessRate = await getRecentOverallSuccessRate(c.env.DB, coin, timeframe, 1);
+
+    // 5. 신호 생성 시간 계산
+    const latestPrediction = recentPredictions.results[0] as any;
+    const signalAge = (Date.now() - new Date(latestPrediction.created_at).getTime()) / 1000 / 60; // 분 단위
+
+    // 6. Prediction 객체 변환
+    const predictions = recentPredictions.results.map((row: any) => ({
+      id: row.id,
+      expertId: row.expert_id,
+      expertName: row.name,
+      expertEmoji: row.emoji,
+      expertStrategy: row.strategy,
+      coin: row.coin,
+      timeframe: row.timeframe,
+      signal: row.signal,
+      confidence: row.confidence,
+      entryPrice: row.entry_price,
+      exitPrice: row.exit_price,
+      status: row.status,
+      profitPercent: row.profit_percent,
+      createdAt: new Date(row.created_at),
+      checkedAt: row.checked_at ? new Date(row.checked_at) : null,
+      indicatorContributions: null
+    }));
+
+    // 7. 가중치 컨센서스 계산
+    const weightedConsensus = calculateWeightedConsensus(predictions, expertWinRates);
+
+    // 8. 신호 강도 계산
+    const signalStrength = calculateSignalStrength(
+      predictions,
+      expertWinRates,
+      recentSuccessRate,
+      signalAge
+    );
+
+    // 9. 매수/대기 추천 결정
+    const recommendation = getTradingRecommendation(signalStrength);
+
+    // 10. 상위 3개 모델 찾기
+    const sortedExperts = Array.from(expertWinRates.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+
+    const top3Models = sortedExperts.map(([expertId, winRate]) => {
+      const pred = predictions.find(p => p.expertId === expertId);
+      return {
+        expertId,
+        expertName: pred?.expertName || `Expert ${expertId}`,
+        expertEmoji: pred?.expertEmoji || '📊',
+        winRate: Math.round(winRate * 10) / 10,
+        signal: pred?.signal || 'neutral'
+      };
+    });
+
+    // 11. 응답 반환
+    return c.json({
+      hasData: true,
+      coin,
+      timeframe,
+      timestamp: new Date().toISOString(),
+
+      // 신호 강도 및 추천
+      signalStrength,
+      recommendation,
+
+      // 가중치 컨센서스
+      consensus: {
+        signal: weightedConsensus.signal,
+        confidence: Math.round(weightedConsensus.confidence * 10) / 10,
+        weightedLongScore: Math.round(weightedConsensus.weightedLongScore * 10) / 10,
+        weightedShortScore: Math.round(weightedConsensus.weightedShortScore * 10) / 10
+      },
+
+      // 통계
+      stats: {
+        recentSuccessRate: Math.round(recentSuccessRate * 10) / 10,
+        signalAgeMinutes: Math.round(signalAge * 10) / 10,
+        totalPredictions: predictions.length,
+        top3Models
+      },
+
+      // 예측 목록
+      predictions: predictions.map(p => ({
+        expertId: p.expertId,
+        expertName: p.expertName,
+        expertEmoji: p.expertEmoji,
+        signal: p.signal,
+        confidence: Math.round(p.confidence * 10) / 10,
+        winRate: Math.round((expertWinRates.get(p.expertId) || 50) * 10) / 10
+      }))
+    });
+
+  } catch (error: any) {
+    console.error('❌ 트레이딩 추천 계산 실패:', error);
+    return c.json({ error: error.message, hasData: false }, 500);
+  }
+});
+
 // Get specific AI expert details
 app.get('/api/ai/experts/:id', async (c) => {
   const expertId = parseInt(c.req.param('id'));
@@ -445,6 +627,612 @@ app.get('/api/ai/consensus', async (c) => {
   }
 });
 
+// Get live predictions (pending) for all timeframes
+app.get('/api/ai/predictions/live', async (c) => {
+  const coin = c.req.query('coin') || 'btc';
+
+  try {
+    // 최근 2시간 이내 pending 예측만 조회 (모든 타임프레임)
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+    const predictions = await c.env.DB
+      .prepare(
+        `SELECT p.*, ep.name, ep.emoji, ep.strategy
+         FROM predictions p
+         JOIN expert_profiles ep ON p.expert_id = ep.id
+         WHERE p.coin = ? AND p.status = 'pending' AND p.created_at >= ?
+         ORDER BY p.timeframe, p.expert_id`
+      )
+      .bind(coin, twoHoursAgo)
+      .all();
+
+    // 타임프레임별로 그룹화
+    const timeframes = ['5m', '10m', '30m', '1h', '6h', '12h', '24h'];
+    const groupedByTimeframe: any = {};
+
+    timeframes.forEach(tf => {
+      const tfPredictions = predictions.results.filter((p: any) => p.timeframe === tf);
+
+      if (tfPredictions.length > 0) {
+        // 컨센서스 계산
+        const longCount = tfPredictions.filter((p: any) => p.signal === 'long').length;
+        const shortCount = tfPredictions.filter((p: any) => p.signal === 'short').length;
+        const neutralCount = tfPredictions.filter((p: any) => p.signal === 'neutral').length;
+        const totalExperts = tfPredictions.length;
+
+        let consensusSignal: 'long' | 'short' | 'neutral';
+        let consensusConfidence: number;
+
+        if (longCount > shortCount && longCount > neutralCount) {
+          consensusSignal = 'long';
+          consensusConfidence = (longCount / totalExperts) * 100;
+        } else if (shortCount > longCount && shortCount > neutralCount) {
+          consensusSignal = 'short';
+          consensusConfidence = (shortCount / totalExperts) * 100;
+        } else {
+          consensusSignal = 'neutral';
+          consensusConfidence = (neutralCount / totalExperts) * 100;
+        }
+
+        groupedByTimeframe[tf] = {
+          consensus: {
+            signal: consensusSignal,
+            confidence: consensusConfidence,
+            longCount,
+            shortCount,
+            neutralCount,
+            totalExperts
+          },
+          predictions: tfPredictions.map((row: any) => ({
+            id: row.id,
+            expertId: row.expert_id,
+            expertName: row.name,
+            expertEmoji: row.emoji,
+            expertStrategy: row.strategy,
+            signal: row.signal,
+            confidence: row.confidence,
+            entryPrice: row.entry_price,
+            createdAt: row.created_at
+          }))
+        };
+      }
+    });
+
+    return c.json({
+      coin,
+      timeframes: groupedByTimeframe,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get prediction history with results
+app.get('/api/ai/predictions/history', async (c) => {
+  const coin = c.req.query('coin') || 'btc';
+  const timeframe = c.req.query('timeframe'); // optional
+  const expertId = c.req.query('expert'); // optional
+  const limit = parseInt(c.req.query('limit') || '100');
+  const status = c.req.query('status'); // optional: 'success' or 'fail'
+
+  try {
+    let query = `
+      SELECT p.*, ep.name, ep.emoji, ep.strategy
+      FROM predictions p
+      JOIN expert_profiles ep ON p.expert_id = ep.id
+      WHERE p.coin = ? AND p.status IN ('success', 'fail')
+    `;
+
+    const bindings: any[] = [coin];
+
+    if (timeframe) {
+      query += ` AND p.timeframe = ?`;
+      bindings.push(timeframe);
+    }
+
+    if (expertId) {
+      query += ` AND p.expert_id = ?`;
+      bindings.push(parseInt(expertId));
+    }
+
+    if (status) {
+      query += ` AND p.status = ?`;
+      bindings.push(status);
+    }
+
+    query += ` ORDER BY p.created_at DESC LIMIT ?`;
+    bindings.push(limit);
+
+    const predictions = await c.env.DB
+      .prepare(query)
+      .bind(...bindings)
+      .all();
+
+    // 통계 계산
+    const totalPredictions = predictions.results.length;
+    const successCount = predictions.results.filter((p: any) => p.status === 'success').length;
+    const failCount = predictions.results.filter((p: any) => p.status === 'fail').length;
+    const successRate = totalPredictions > 0 ? (successCount / totalPredictions) * 100 : 0;
+
+    // 평균 수익률 계산
+    const avgProfit = predictions.results.reduce((sum: number, p: any) =>
+      sum + (p.profit_percent || 0), 0) / totalPredictions;
+
+    return c.json({
+      coin,
+      timeframe: timeframe || 'all',
+      expertId: expertId || 'all',
+      stats: {
+        totalPredictions,
+        successCount,
+        failCount,
+        successRate: parseFloat(successRate.toFixed(2)),
+        avgProfit: parseFloat(avgProfit.toFixed(2))
+      },
+      predictions: predictions.results.map((row: any) => ({
+        id: row.id,
+        expertId: row.expert_id,
+        expertName: row.name,
+        expertEmoji: row.emoji,
+        expertStrategy: row.strategy,
+        timeframe: row.timeframe,
+        signal: row.signal,
+        confidence: row.confidence,
+        entryPrice: row.entry_price,
+        exitPrice: row.exit_price,
+        profitPercent: row.profit_percent,
+        status: row.status,
+        createdAt: row.created_at,
+        checkedAt: row.checked_at
+      })),
+      count: predictions.results.length
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ==========================================
+// Trading Arena API Endpoints
+// ==========================================
+
+// Get leaderboard (트레이더 순위)
+app.get('/api/trading-arena/leaderboard', async (c) => {
+  const coin = (c.req.query('coin') || 'btc') as 'btc' | 'eth';
+
+  try {
+    const leaderboard = await c.env.DB
+      .prepare(`
+        SELECT
+          tb.expert_id as expertId,
+          ep.name,
+          ep.emoji,
+          ep.strategy,
+          tb.current_balance as currentBalance,
+          tb.initial_balance as initialBalance,
+          tb.today_profit_percent as todayProfitPercent,
+          tb.today_profit_amount as todayProfitAmount,
+          tb.today_trades as todayTrades,
+          tb.today_wins as todayWins,
+          tb.today_losses as todayLosses,
+          tb.total_trades as totalTrades,
+          tb.win_rate as winRate,
+          tb.total_profit_percent as totalProfitPercent,
+          tb.best_trade_percent as bestTradePercent,
+          tb.worst_trade_percent as worstTradePercent,
+          tb.consecutive_wins as consecutiveWins,
+          tb.consecutive_losses as consecutiveLosses,
+          tb.status
+        FROM trader_balances tb
+        JOIN expert_profiles ep ON tb.expert_id = ep.id
+        WHERE tb.coin = ?
+        ORDER BY tb.current_balance DESC
+      `)
+      .bind(coin)
+      .all();
+
+    return c.json({
+      coin,
+      timestamp: new Date().toISOString(),
+      leaderboard: leaderboard.results || []
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get open positions (열린 포지션)
+app.get('/api/trading-arena/positions/open', async (c) => {
+  const coin = c.req.query('coin') as 'btc' | 'eth' | undefined;
+
+  try {
+    let query = `
+      SELECT
+        ts.id,
+        ts.expert_id as expertId,
+        ep.name as expertName,
+        ep.emoji as expertEmoji,
+        ts.coin,
+        ts.position,
+        ts.entry_time as entryTime,
+        ts.entry_price as entryPrice,
+        ts.entry_confidence as entryConfidence,
+        ts.balance_before as balanceBefore
+      FROM trading_sessions ts
+      JOIN expert_profiles ep ON ts.expert_id = ep.id
+      WHERE ts.status = 'open'
+    `;
+
+    const bindings: any[] = [];
+    if (coin) {
+      query += ` AND ts.coin = ?`;
+      bindings.push(coin);
+    }
+
+    query += ` ORDER BY ts.entry_time DESC`;
+
+    const positions = await c.env.DB
+      .prepare(query)
+      .bind(...bindings)
+      .all();
+
+    return c.json({
+      coin: coin || 'all',
+      count: positions.results.length,
+      positions: positions.results || []
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get recent closed trades (최근 거래 내역)
+app.get('/api/trading-arena/trades/recent', async (c) => {
+  const coin = c.req.query('coin') as 'btc' | 'eth' | undefined;
+  const limit = parseInt(c.req.query('limit') || '50');
+
+  try {
+    let query = `
+      SELECT
+        ts.id,
+        ts.expert_id as expertId,
+        ep.name as expertName,
+        ep.emoji as expertEmoji,
+        ts.coin,
+        ts.position,
+        ts.entry_time as entryTime,
+        ts.entry_price as entryPrice,
+        ts.exit_time as exitTime,
+        ts.exit_price as exitPrice,
+        ts.exit_reason as exitReason,
+        ts.hold_duration_minutes as holdDurationMinutes,
+        ts.leveraged_profit_percent as leveragedProfitPercent,
+        ts.profit_amount as profitAmount,
+        ts.balance_before as balanceBefore,
+        ts.balance_after as balanceAfter,
+        ts.status
+      FROM trading_sessions ts
+      JOIN expert_profiles ep ON ts.expert_id = ep.id
+      WHERE ts.status IN ('closed_win', 'closed_loss', 'closed_timeout')
+    `;
+
+    const bindings: any[] = [];
+    if (coin) {
+      query += ` AND ts.coin = ?`;
+      bindings.push(coin);
+    }
+
+    query += ` ORDER BY ts.exit_time DESC LIMIT ?`;
+    bindings.push(limit);
+
+    const trades = await c.env.DB
+      .prepare(query)
+      .bind(...bindings)
+      .all();
+
+    return c.json({
+      coin: coin || 'all',
+      count: trades.results.length,
+      trades: trades.results || []
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get trader stats (트레이더별 상세 통계)
+app.get('/api/trading-arena/trader/:expertId', async (c) => {
+  const expertId = parseInt(c.params.expertId);
+  const coin = (c.req.query('coin') || 'btc') as 'btc' | 'eth';
+
+  try {
+    // 트레이더 정보 및 잔고
+    const trader = await c.env.DB
+      .prepare(`
+        SELECT
+          tb.*,
+          ep.name,
+          ep.emoji,
+          ep.strategy
+        FROM trader_balances tb
+        JOIN expert_profiles ep ON tb.expert_id = ep.id
+        WHERE tb.expert_id = ? AND tb.coin = ?
+      `)
+      .bind(expertId, coin)
+      .first();
+
+    if (!trader) {
+      return c.json({ error: 'Trader not found' }, 404);
+    }
+
+    // 최근 10개 거래
+    const recentTrades = await c.env.DB
+      .prepare(`
+        SELECT * FROM trading_sessions
+        WHERE expert_id = ? AND coin = ?
+        AND status IN ('closed_win', 'closed_loss', 'closed_timeout')
+        ORDER BY exit_time DESC
+        LIMIT 10
+      `)
+      .bind(expertId, coin)
+      .all();
+
+    return c.json({
+      trader,
+      recentTrades: recentTrades.results || []
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get live predictions (실시간 예측 신뢰도)
+app.get('/api/trading-arena/predictions/live', async (c) => {
+  const coin = (c.req.query('coin') || 'btc') as 'btc' | 'eth';
+
+  try {
+    // 1. 가격 데이터 가져오기
+    const symbol = coin === 'btc' ? 'BTC' : 'ETH';
+    const candles = await upbitService.getCandles(symbol, 10, 100);
+    const currentPrice = candles[candles.length - 1].close;
+
+    // 2. 기술적 지표 계산
+    const { generateTechnicalSignals } = await import('./services/ai/signals');
+    const signals = generateTechnicalSignals(candles, currentPrice);
+
+    // 3. 각 전문가별 예측 생성
+    const { predictByExpert } = await import('./services/ai/predictions');
+    const { EXPERT_IDS } = await import('./services/ai/experts');
+    const expertProfiles = (await import('./services/ai/experts')).expertProfiles;
+
+    const predictions = EXPERT_IDS.map(expertId => {
+      const profile = expertProfiles.find(p => p.id === expertId);
+      const prediction = predictByExpert(
+        expertId,
+        coin,
+        '10m',
+        signals,
+        currentPrice,
+        null
+      );
+
+      return {
+        expertId,
+        expertName: profile?.name || 'Unknown',
+        expertEmoji: profile?.emoji || '❓',
+        signal: prediction?.signal || 'neutral',
+        confidence: prediction?.confidence || 0,
+        canEnter: prediction ? prediction.confidence >= 60 && prediction.signal !== 'neutral' : false
+      };
+    });
+
+    return c.json({
+      coin,
+      timestamp: new Date().toISOString(),
+      currentPrice,
+      predictions
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ==================== 트레이딩 아레나 히스토리 API ====================
+
+// Get daily performance stats (일별 성과 통계)
+app.get('/api/trading-arena/history/daily-stats', async (c) => {
+  const coin = (c.req.query('coin') || 'btc') as 'btc' | 'eth';
+
+  // 날짜 범위 파라미터 (startDate, endDate)
+  const startDate = c.req.query('startDate');
+  const endDate = c.req.query('endDate');
+
+  // 기본값: 최근 7일
+  const defaultEndDate = new Date().toISOString().split('T')[0];
+  const defaultStartDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const finalStartDate = startDate || defaultStartDate;
+  const finalEndDate = endDate || defaultEndDate;
+
+  try {
+    const dailyStats = await c.env.DB
+      .prepare(`
+        SELECT
+          DATE(ts.exit_time) as date,
+          ts.expert_id as expertId,
+          ep.name as expertName,
+          ep.emoji as expertEmoji,
+          COUNT(*) as trades,
+          SUM(CASE WHEN ts.status = 'closed_win' THEN 1 ELSE 0 END) as wins,
+          SUM(CASE WHEN ts.status = 'closed_loss' THEN 1 ELSE 0 END) as losses,
+          SUM(ts.profit_amount) as totalProfit,
+          AVG(ts.leveraged_profit_percent) as avgProfitPercent,
+          MAX(ts.leveraged_profit_percent) as bestTradePercent,
+          MIN(ts.leveraged_profit_percent) as worstTradePercent
+        FROM trading_sessions ts
+        JOIN expert_profiles ep ON ts.expert_id = ep.id
+        WHERE ts.coin = ?
+          AND ts.status IN ('closed_win', 'closed_loss', 'closed_timeout')
+          AND DATE(ts.exit_time) >= ?
+          AND DATE(ts.exit_time) <= ?
+        GROUP BY DATE(ts.exit_time), ts.expert_id
+        ORDER BY date DESC, totalProfit DESC
+      `)
+      .bind(coin, finalStartDate, finalEndDate)
+      .all();
+
+    return c.json({
+      coin,
+      startDate: finalStartDate,
+      endDate: finalEndDate,
+      stats: dailyStats.results || []
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get cumulative performance over time (누적 성과 추이)
+app.get('/api/trading-arena/history/performance', async (c) => {
+  const coin = (c.req.query('coin') || 'btc') as 'btc' | 'eth';
+  const expertId = c.req.query('expertId') ? parseInt(c.req.query('expertId')!) : undefined;
+
+  try {
+    let query = `
+      SELECT
+        ts.expert_id as expertId,
+        ep.name as expertName,
+        ep.emoji as expertEmoji,
+        ts.exit_time as timestamp,
+        ts.balance_after as balance,
+        ts.leveraged_profit_percent as profitPercent,
+        ts.profit_amount as profitAmount,
+        ts.status
+      FROM trading_sessions ts
+      JOIN expert_profiles ep ON ts.expert_id = ep.id
+      WHERE ts.coin = ?
+        AND ts.status IN ('closed_win', 'closed_loss', 'closed_timeout')
+    `;
+
+    const bindings: any[] = [coin];
+
+    if (expertId) {
+      query += ` AND ts.expert_id = ?`;
+      bindings.push(expertId);
+    }
+
+    query += ` ORDER BY ts.exit_time ASC`;
+
+    const performance = await c.env.DB
+      .prepare(query)
+      .bind(...bindings)
+      .all();
+
+    return c.json({
+      coin,
+      expertId: expertId || 'all',
+      data: performance.results || []
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get all trades with pagination (전체 거래 내역)
+app.get('/api/trading-arena/history/all-trades', async (c) => {
+  const coin = c.req.query('coin') as 'btc' | 'eth' | undefined;
+  const expertId = c.req.query('expertId') ? parseInt(c.req.query('expertId')!) : undefined;
+  const page = parseInt(c.req.query('page') || '1');
+  const limit = parseInt(c.req.query('limit') || '100');
+  const offset = (page - 1) * limit;
+
+  // 날짜 범위 파라미터
+  const startDate = c.req.query('startDate');
+  const endDate = c.req.query('endDate');
+
+  try {
+    let query = `
+      SELECT
+        ts.id,
+        ts.expert_id as expertId,
+        ep.name as expertName,
+        ep.emoji as expertEmoji,
+        ts.coin,
+        ts.position,
+        ts.entry_time as entryTime,
+        ts.entry_price as entryPrice,
+        ts.exit_time as exitTime,
+        ts.exit_price as exitPrice,
+        ts.exit_reason as exitReason,
+        ts.hold_duration_minutes as holdDurationMinutes,
+        ts.leveraged_profit_percent as leveragedProfitPercent,
+        ts.profit_amount as profitAmount,
+        ts.balance_before as balanceBefore,
+        ts.balance_after as balanceAfter,
+        ts.status
+      FROM trading_sessions ts
+      JOIN expert_profiles ep ON ts.expert_id = ep.id
+      WHERE ts.status IN ('closed_win', 'closed_loss', 'closed_timeout')
+    `;
+
+    const bindings: any[] = [];
+
+    if (coin) {
+      query += ` AND ts.coin = ?`;
+      bindings.push(coin);
+    }
+
+    if (expertId) {
+      query += ` AND ts.expert_id = ?`;
+      bindings.push(expertId);
+    }
+
+    if (startDate) {
+      query += ` AND DATE(ts.exit_time) >= ?`;
+      bindings.push(startDate);
+    }
+
+    if (endDate) {
+      query += ` AND DATE(ts.exit_time) <= ?`;
+      bindings.push(endDate);
+    }
+
+    // Get total count
+    const countQuery = query.replace(
+      /SELECT[\s\S]+FROM/,
+      'SELECT COUNT(*) as total FROM'
+    );
+    const countResult = await c.env.DB
+      .prepare(countQuery)
+      .bind(...bindings)
+      .first();
+
+    const total = (countResult?.total as number) || 0;
+
+    // Get paginated results
+    query += ` ORDER BY ts.exit_time DESC LIMIT ? OFFSET ?`;
+    bindings.push(limit, offset);
+
+    const trades = await c.env.DB
+      .prepare(query)
+      .bind(...bindings)
+      .all();
+
+    return c.json({
+      coin: coin || 'all',
+      expertId: expertId || 'all',
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      trades: trades.results || []
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 // Scheduled cron trigger handler
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -457,9 +1245,13 @@ export default {
 
     console.log(`⏰ Cron triggered: ${cronType} at ${new Date(event.scheduledTime).toISOString()}`);
 
-    // AI 전문가 자동 학습 (매 1분)
+    // AI 전문가 자동 학습 & 트레이딩 아레나 (매 1분)
     if (cronType === '*/1 * * * *') {
-      await handleAILearning(event, env, ctx);
+      // 두 크론 동시 실행
+      await Promise.all([
+        handleAILearning(event, env, ctx),
+        handleTradingArena(event, env, ctx)
+      ]);
     }
 
     // TODO: Implement additional cron handlers

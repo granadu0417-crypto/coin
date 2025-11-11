@@ -3,6 +3,7 @@ export interface Env {
   DB: D1Database;
   CACHE: KVNamespace;
   AI: any; // Cloudflare AI binding for translation
+  CANDLE_BUILDER: DurableObjectNamespace; // Real-time candle builder
   ALLOWED_ORIGINS: string;
 }
 

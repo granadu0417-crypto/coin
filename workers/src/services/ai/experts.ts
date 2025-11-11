@@ -333,7 +333,7 @@ export function getExpertProfile(expertId: number): ExpertProfile | undefined {
 export const EXPERT_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 // 지원하는 타임프레임 목록
-export const TIMEFRAMES = ['5m', '10m', '30m', '1h'] as const;
+export const TIMEFRAMES = ['5m', '10m', '30m', '1h', '6h', '12h', '24h'] as const;
 
 // 지원하는 코인 목록
 export const COINS = ['btc', 'eth'] as const;
