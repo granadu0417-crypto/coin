@@ -35,6 +35,7 @@ export default function History() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'daily' | 'model'>('daily');
 
   // 날짜 범위 상태 (기본값: 최근 7일)
   const getDefaultDates = () => {
@@ -142,6 +143,54 @@ export default function History() {
     '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'
   ];
 
+  // 모델별 집계 데이터 계산
+  const modelStats = experts.map(expert => {
+    const expertStats = dailyStats.filter(stat => stat.expertName === expert.name);
+
+    if (expertStats.length === 0) {
+      return {
+        expertId: expert.id,
+        expertName: expert.name,
+        expertEmoji: expert.emoji,
+        totalTrades: 0,
+        totalWins: 0,
+        totalLosses: 0,
+        winRate: 0,
+        avgProfit: 0,
+        totalProfitAmount: 0,
+        bestDay: null,
+        worstDay: null,
+        dailyData: []
+      };
+    }
+
+    const totalTrades = expertStats.reduce((sum, stat) => sum + stat.trades, 0);
+    const totalWins = expertStats.reduce((sum, stat) => sum + stat.wins, 0);
+    const totalLosses = expertStats.reduce((sum, stat) => sum + stat.losses, 0);
+    const totalProfitAmount = expertStats.reduce((sum, stat) => sum + stat.totalProfit, 0);
+    const avgProfit = expertStats.reduce((sum, stat) => sum + stat.avgProfitPercent, 0) / expertStats.length;
+
+    // 최고/최악의 날 찾기
+    const sortedByProfit = [...expertStats].sort((a, b) => b.totalProfit - a.totalProfit);
+    const bestDay = sortedByProfit[0];
+    const worstDay = sortedByProfit[sortedByProfit.length - 1];
+
+    return {
+      expertId: expert.id,
+      expertName: expert.name,
+      expertEmoji: expert.emoji,
+      totalTrades,
+      totalWins,
+      totalLosses,
+      winRate: totalTrades > 0 ? (totalWins / totalTrades) * 100 : 0,
+      avgProfit,
+      totalProfitAmount,
+      bestDay,
+      worstDay,
+      dailyData: expertStats
+    };
+  }).filter(stat => stat.totalTrades > 0); // 거래가 없는 모델은 제외
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-[1800px] mx-auto space-y-6">
@@ -239,7 +288,33 @@ export default function History() {
         {/* 일별 통계 */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 border border-slate-700">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">📅 일별 성과 통계</h2>
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-bold text-white">📊 성과 분석</h2>
+
+              {/* 탭 버튼 */}
+              <div className="flex gap-2 bg-slate-800/50 p-1 rounded-lg">
+                <button
+                  onClick={() => setActiveTab('daily')}
+                  className={`px-4 py-2 rounded-md font-semibold transition-all text-sm ${
+                    activeTab === 'daily'
+                      ? 'bg-blue-500 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📅 일별 상세
+                </button>
+                <button
+                  onClick={() => setActiveTab('model')}
+                  className={`px-4 py-2 rounded-md font-semibold transition-all text-sm ${
+                    activeTab === 'model'
+                      ? 'bg-purple-500 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🎯 모델별 분석
+                </button>
+              </div>
+            </div>
 
             {/* 날짜 범위 선택 */}
             <div className="flex items-center gap-3">
@@ -280,55 +355,298 @@ export default function History() {
               </button>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead>
-                <tr className="text-left text-slate-400 text-sm border-b border-slate-700">
-                  <th className="pb-3">날짜</th>
-                  <th className="pb-3">트레이더</th>
-                  <th className="pb-3 text-center">거래</th>
-                  <th className="pb-3 text-center">승</th>
-                  <th className="pb-3 text-center">패</th>
-                  <th className="pb-3 text-right">총 수익</th>
-                  <th className="pb-3 text-right">평균 수익률</th>
-                  <th className="pb-3 text-right">최고</th>
-                  <th className="pb-3 text-right">최악</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dailyStats.map((stat, index) => (
-                  <tr key={index} className="border-b border-slate-800 hover:bg-slate-800/30">
-                    <td className="py-3 text-slate-300">
-                      {new Date(stat.date.endsWith('Z') ? stat.date : `${stat.date}Z`).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
-                    </td>
-                    <td className="py-3">
-                      <span className="text-lg mr-2">{stat.expertEmoji}</span>
-                      <span className="text-white font-medium">{stat.expertName}</span>
-                    </td>
-                    <td className="py-3 text-center text-slate-300">{stat.trades}</td>
-                    <td className="py-3 text-center text-green-400">{stat.wins}</td>
-                    <td className="py-3 text-center text-red-400">{stat.losses}</td>
-                    <td className={`py-3 text-right font-semibold ${
-                      stat.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      ${stat.totalProfit.toFixed(2)}
-                    </td>
-                    <td className={`py-3 text-right ${
-                      stat.avgProfitPercent >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {stat.avgProfitPercent.toFixed(2)}%
-                    </td>
-                    <td className="py-3 text-right text-green-400">
-                      +{stat.bestTradePercent.toFixed(2)}%
-                    </td>
-                    <td className="py-3 text-right text-red-400">
-                      {stat.worstTradePercent.toFixed(2)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+          {/* 일별 상세 탭 - DATE-FIRST VIEW */}
+          {activeTab === 'daily' && (
+            <div className="space-y-6">
+              {(() => {
+                // Group stats by date
+                const statsByDate: { [key: string]: typeof dailyStats } = {};
+                dailyStats.forEach(stat => {
+                  if (!statsByDate[stat.date]) {
+                    statsByDate[stat.date] = [];
+                  }
+                  statsByDate[stat.date].push(stat);
+                });
+
+                // Sort dates in descending order (most recent first)
+                const sortedDates = Object.keys(statsByDate).sort((a, b) => b.localeCompare(a));
+
+                return sortedDates.map(date => {
+                  const dateStats = statsByDate[date];
+                  // Sort models by profit for this date
+                  const rankedStats = [...dateStats].sort((a, b) => b.totalProfit - a.totalProfit);
+                  const totalTrades = dateStats.reduce((sum, s) => sum + s.trades, 0);
+                  const totalProfit = dateStats.reduce((sum, s) => sum + s.totalProfit, 0);
+
+                  return (
+                    <div key={date} className="bg-slate-800/30 rounded-xl p-6 border border-slate-700">
+                      {/* Date Header with Summary */}
+                      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-600">
+                        <div>
+                          <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                            📅 {new Date(date.endsWith('Z') ? date : `${date}Z`).toLocaleDateString('ko-KR', {
+                              timeZone: 'Asia/Seoul',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              weekday: 'short'
+                            })}
+                          </h3>
+                          <p className="text-slate-400 text-sm mt-1">
+                            총 {totalTrades}건 거래 • 전체 수익: <span className={totalProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
+                              {totalProfit >= 0 ? '+' : ''}${(totalProfit / 1000).toFixed(1)}K
+                            </span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-slate-500">최고 모델</div>
+                          <div className="text-lg font-bold text-yellow-400">
+                            {rankedStats[0].expertEmoji} {rankedStats[0].expertName}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Models Performance Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[800px]">
+                          <thead>
+                            <tr className="text-left text-slate-400 text-sm border-b border-slate-600">
+                              <th className="pb-3 w-8"></th>
+                              <th className="pb-3">모델</th>
+                              <th className="pb-3 text-center">거래</th>
+                              <th className="pb-3 text-center">승/패</th>
+                              <th className="pb-3 text-center">승률</th>
+                              <th className="pb-3 text-right">총 수익</th>
+                              <th className="pb-3 text-right">평균 수익률</th>
+                              <th className="pb-3 text-right">최고 거래</th>
+                              <th className="pb-3 text-right">최악 거래</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rankedStats.map((stat, index) => (
+                              <tr key={stat.expertName} className="border-b border-slate-700/30 hover:bg-slate-700/20">
+                                <td className="py-3">
+                                  {index < 3 && (
+                                    <span className="text-xl">
+                                      {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xl">{stat.expertEmoji}</span>
+                                    <span className="text-white font-medium">{stat.expertName}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3 text-center text-slate-200 font-bold text-lg">{stat.trades}</td>
+                                <td className="py-3 text-center text-base">
+                                  <span className="text-green-400 font-bold">{stat.wins}</span>
+                                  <span className="text-slate-600 mx-1">/</span>
+                                  <span className="text-red-400 font-bold">{stat.losses}</span>
+                                </td>
+                                <td className="py-3 text-center">
+                                  <span className={`px-2 py-1 rounded-lg font-bold text-sm ${
+                                    (stat.wins / stat.trades * 100) >= 60 ? 'bg-green-500/30 text-green-300' :
+                                    (stat.wins / stat.trades * 100) >= 50 ? 'bg-yellow-500/30 text-yellow-300' :
+                                    'bg-red-500/30 text-red-300'
+                                  }`}>
+                                    {((stat.wins / stat.trades) * 100).toFixed(0)}%
+                                  </span>
+                                </td>
+                                <td className={`py-3 text-right font-bold text-lg ${
+                                  stat.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                                }`}>
+                                  {stat.totalProfit >= 0 ? '+' : ''}${(stat.totalProfit / 1000).toFixed(1)}K
+                                </td>
+                                <td className={`py-3 text-right font-semibold ${
+                                  stat.avgProfitPercent >= 0 ? 'text-green-400' : 'text-red-400'
+                                }`}>
+                                  {stat.avgProfitPercent >= 0 ? '+' : ''}{stat.avgProfitPercent.toFixed(2)}%
+                                </td>
+                                <td className="py-3 text-right text-green-400 font-semibold">
+                                  +{stat.bestTradePercent.toFixed(2)}%
+                                </td>
+                                <td className="py-3 text-right text-red-400 font-semibold">
+                                  {stat.worstTradePercent.toFixed(2)}%
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+
+              {dailyStats.length === 0 && (
+                <div className="text-center py-12 text-slate-400">
+                  선택한 기간에 거래 내역이 없습니다
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 모델별 분석 탭 */}
+          {activeTab === 'model' && (
+            <div className="space-y-6">
+              {/* 모델별 요약 테이블 */}
+              <div className="overflow-x-auto bg-slate-800/30 rounded-lg p-6">
+                <table className="w-full min-w-[1000px]">
+                  <thead>
+                    <tr className="text-left text-slate-300 border-b-2 border-slate-600">
+                      <th className="pb-4 text-base font-bold">모델</th>
+                      <th className="pb-4 text-center text-base font-bold">거래수</th>
+                      <th className="pb-4 text-center text-base font-bold">승률</th>
+                      <th className="pb-4 text-right text-base font-bold">💰 총 수익금</th>
+                      <th className="pb-4 text-center text-base font-bold">승/패</th>
+                      <th className="pb-4 text-right text-sm">최고의 날</th>
+                      <th className="pb-4 text-right text-sm">최악의 날</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modelStats.sort((a, b) => b.totalProfitAmount - a.totalProfitAmount).map((model, index) => (
+                      <tr key={model.expertId} className={`border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${index < 3 ? 'bg-blue-900/10' : ''}`}>
+                        <td className="py-4">
+                          <div className="flex items-center gap-2">
+                            {index < 3 && (
+                              <span className="text-yellow-400 font-bold text-sm">
+                                {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                              </span>
+                            )}
+                            <span className="text-2xl">{model.expertEmoji}</span>
+                            <span className="text-white font-semibold text-base">{model.expertName}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 text-center text-slate-200 font-bold text-lg">
+                          {model.totalTrades}
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className={`px-3 py-1.5 rounded-lg font-bold text-base ${
+                            model.winRate >= 60 ? 'bg-green-500/30 border border-green-400 text-green-300' :
+                            model.winRate >= 50 ? 'bg-yellow-500/30 border border-yellow-400 text-yellow-300' :
+                            'bg-red-500/30 border border-red-400 text-red-300'
+                          }`}>
+                            {model.winRate.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className={`py-4 text-right font-black text-2xl ${
+                          model.totalProfitAmount >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {model.totalProfitAmount >= 0 ? '+' : ''}${(model.totalProfitAmount / 1000000).toFixed(2)}M
+                        </td>
+                        <td className="py-4 text-center text-base">
+                          <span className="text-green-400 font-bold">{model.totalWins}</span>
+                          <span className="text-slate-600 mx-1">/</span>
+                          <span className="text-red-400 font-bold">{model.totalLosses}</span>
+                        </td>
+                        <td className="py-4 text-right">
+                          {model.bestDay && (
+                            <div>
+                              <div className="text-green-400 font-bold text-base">
+                                +${(model.bestDay.totalProfit / 1000).toFixed(1)}K
+                              </div>
+                              <div className="text-slate-500 text-xs mt-0.5">
+                                {new Date(model.bestDay.date.endsWith('Z') ? model.bestDay.date : `${model.bestDay.date}Z`).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' })}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 text-right">
+                          {model.worstDay && (
+                            <div>
+                              <div className="text-red-400 font-bold text-base">
+                                ${(model.worstDay.totalProfit / 1000).toFixed(1)}K
+                              </div>
+                              <div className="text-slate-500 text-xs mt-0.5">
+                                {new Date(model.worstDay.date.endsWith('Z') ? model.worstDay.date : `${model.worstDay.date}Z`).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' })}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 일별 수익금 히트맵 */}
+              <div className="bg-slate-800/30 rounded-lg p-6">
+                <h3 className="text-xl font-bold text-white mb-6">💰 일별 수익금 한눈에 보기</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-slate-300">
+                        <th className="pb-4 text-left sticky left-0 bg-slate-800/30 text-base font-bold">모델</th>
+                        {Array.from(new Set(dailyStats.map(s => s.date))).sort().map(date => (
+                          <th key={date} className="pb-4 text-center px-3 min-w-[100px] text-base font-semibold">
+                            {new Date(date.endsWith('Z') ? date : `${date}Z`).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' })}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modelStats.map(model => (
+                        <tr key={model.expertId} className="border-t border-slate-700/50">
+                          <td className="py-3 sticky left-0 bg-slate-800/30">
+                            <span className="text-xl mr-2">{model.expertEmoji}</span>
+                            <span className="text-white text-sm font-medium">{model.expertName}</span>
+                          </td>
+                          {Array.from(new Set(dailyStats.map(s => s.date))).sort().map(date => {
+                            const dayStat = model.dailyData.find(d => d.date === date);
+                            if (!dayStat) {
+                              return (
+                                <td key={date} className="py-3 px-3 text-center">
+                                  <div className="bg-slate-700/30 rounded-lg px-3 py-2 text-slate-500 text-sm">-</div>
+                                </td>
+                              );
+                            }
+                            const profit = dayStat.totalProfit;
+                            const profitK = profit / 1000;
+                            const bgColor = profit > 1000000 ? 'bg-green-500/50 border-2 border-green-400 text-green-200' :
+                                           profit > 0 ? 'bg-green-500/30 border border-green-500/50 text-green-300' :
+                                           profit > -1000000 ? 'bg-red-500/30 border border-red-500/50 text-red-300' :
+                                           'bg-red-500/50 border-2 border-red-400 text-red-200';
+                            return (
+                              <td key={date} className="py-3 px-3 text-center">
+                                <div className={`rounded-lg px-3 py-2 font-bold ${bgColor}`}>
+                                  <div className="text-base">
+                                    {profit >= 0 ? '+' : ''}{profitK >= 1000 || profitK <= -1000 ? `$${(profitK / 1000).toFixed(1)}M` : `$${profitK.toFixed(0)}K`}
+                                  </div>
+                                  <div className="text-xs opacity-75 mt-0.5">
+                                    {dayStat.avgProfitPercent >= 0 ? '+' : ''}{dayStat.avgProfitPercent.toFixed(1)}%
+                                  </div>
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-6 flex items-center gap-6 text-sm text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-green-500/50 border-2 border-green-400 rounded"></div>
+                    <span className="font-medium">&gt;$1M 대박</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-green-500/30 border border-green-500/50 rounded"></div>
+                    <span>수익</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-red-500/30 border border-red-500/50 rounded"></div>
+                    <span>손실</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-red-500/50 border-2 border-red-400 rounded"></div>
+                    <span className="font-medium">&gt;$1M 손실</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 전체 거래 내역 */}
