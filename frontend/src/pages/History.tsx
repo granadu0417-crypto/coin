@@ -366,14 +366,14 @@ export default function History() {
             <>
               {/* 날짜별 거래 내역 */}
               {(() => {
-                // 날짜별로 그룹화 (UTC 날짜 기준)
+                // 날짜별로 그룹화 (KST 날짜 기준)
                 const tradesByDate: { [key: string]: typeof allTrades } = {};
                 allTrades.forEach(trade => {
-                  const exitDate = new Date(trade.exitTime);
-                  // UTC 날짜만 추출 (시간 무시)
-                  const utcDateStr = exitDate.toISOString().split('T')[0]; // "2025-11-10"
-                  // UTC 날짜를 기준으로 표시용 문자열 생성
-                  const dateKey = new Date(utcDateStr + 'T00:00:00').toLocaleDateString('ko-KR', {
+                  // UTC 시간을 KST로 변환하여 날짜 추출
+                  const exitDate = new Date(trade.exitTime.endsWith('Z') ? trade.exitTime : `${trade.exitTime}Z`);
+                  // KST 날짜 문자열 생성 (년월일만)
+                  const dateKey = exitDate.toLocaleDateString('ko-KR', {
+                    timeZone: 'Asia/Seoul',
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'
@@ -426,10 +426,10 @@ export default function History() {
                                 </span>
                               </td>
                               <td className="py-3 text-slate-300">
-                                {formatToUTC(trade.entryTime)}
+                                {formatToKST(trade.entryTime)}
                               </td>
                               <td className="py-3 text-slate-300">
-                                {formatToUTC(trade.exitTime)}
+                                {formatToKST(trade.exitTime)}
                               </td>
                               <td className="py-3 text-right text-slate-300">
                                 ${trade.entryPrice.toFixed(2)}

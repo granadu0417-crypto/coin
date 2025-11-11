@@ -1059,7 +1059,7 @@ app.get('/api/trading-arena/history/daily-stats', async (c) => {
     const dailyStats = await c.env.DB
       .prepare(`
         SELECT
-          DATE(ts.exit_time) as date,
+          DATE(datetime(ts.exit_time, '+9 hours')) as date,
           ts.expert_id as expertId,
           ep.name as expertName,
           ep.emoji as expertEmoji,
@@ -1074,9 +1074,9 @@ app.get('/api/trading-arena/history/daily-stats', async (c) => {
         JOIN expert_profiles ep ON ts.expert_id = ep.id
         WHERE ts.coin = ?
           AND ts.status IN ('closed_win', 'closed_loss', 'closed_timeout')
-          AND DATE(ts.exit_time) >= ?
-          AND DATE(ts.exit_time) <= ?
-        GROUP BY DATE(ts.exit_time), ts.expert_id
+          AND DATE(datetime(ts.exit_time, '+9 hours')) >= ?
+          AND DATE(datetime(ts.exit_time, '+9 hours')) <= ?
+        GROUP BY DATE(datetime(ts.exit_time, '+9 hours')), ts.expert_id
         ORDER BY date DESC, totalProfit DESC
       `)
       .bind(coin, finalStartDate, finalEndDate)
@@ -1189,12 +1189,14 @@ app.get('/api/trading-arena/history/all-trades', async (c) => {
     }
 
     if (startDate) {
-      query += ` AND DATE(ts.exit_time) >= ?`;
+      // KST 기준 날짜 필터링 (UTC+9)
+      query += ` AND DATE(datetime(ts.exit_time, '+9 hours')) >= ?`;
       bindings.push(startDate);
     }
 
     if (endDate) {
-      query += ` AND DATE(ts.exit_time) <= ?`;
+      // KST 기준 날짜 필터링 (UTC+9)
+      query += ` AND DATE(datetime(ts.exit_time, '+9 hours')) <= ?`;
       bindings.push(endDate);
     }
 
