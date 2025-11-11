@@ -1097,6 +1097,8 @@ app.get('/api/trading-arena/history/daily-stats', async (c) => {
 app.get('/api/trading-arena/history/performance', async (c) => {
   const coin = (c.req.query('coin') || 'btc') as 'btc' | 'eth';
   const expertId = c.req.query('expertId') ? parseInt(c.req.query('expertId')!) : undefined;
+  const startDate = c.req.query('startDate');
+  const endDate = c.req.query('endDate');
 
   try {
     let query = `
@@ -1120,6 +1122,18 @@ app.get('/api/trading-arena/history/performance', async (c) => {
     if (expertId) {
       query += ` AND ts.expert_id = ?`;
       bindings.push(expertId);
+    }
+
+    if (startDate) {
+      // KST 기준 날짜 필터링 (UTC+9)
+      query += ` AND DATE(datetime(ts.exit_time, '+9 hours')) >= ?`;
+      bindings.push(startDate);
+    }
+
+    if (endDate) {
+      // KST 기준 날짜 필터링 (UTC+9)
+      query += ` AND DATE(datetime(ts.exit_time, '+9 hours')) <= ?`;
+      bindings.push(endDate);
     }
 
     query += ` ORDER BY ts.exit_time ASC`;

@@ -150,9 +150,9 @@ export const arenaApi = {
     return response.data;
   },
 
-  getPerformance: async (coin: 'btc' | 'eth', expertId?: number) => {
+  getPerformance: async (coin: 'btc' | 'eth', expertId?: number, startDate?: string, endDate?: string) => {
     const response = await api.get('/api/trading-arena/history/performance', {
-      params: { coin, expertId },
+      params: { coin, expertId, startDate, endDate },
     });
     return response.data;
   },

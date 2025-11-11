@@ -90,7 +90,7 @@ export default function History() {
   useEffect(() => {
     const fetchPerformance = async () => {
       try {
-        const data = await arenaApi.getPerformance(coin, selectedExpert);
+        const data = await arenaApi.getPerformance(coin, selectedExpert, dateRange.start, dateRange.end);
 
         // 누적 잔고 차트용 데이터 변환
         const chartData: any = {};
@@ -112,7 +112,7 @@ export default function History() {
     };
 
     fetchPerformance();
-  }, [coin, selectedExpert]);
+  }, [coin, selectedExpert, dateRange]);
 
   // 일별 통계 가져오기
   useEffect(() => {
