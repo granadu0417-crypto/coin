@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { TrendingUp, TrendingDown, Minus, RefreshCw, Clock, ArrowRight, AlertCircle } from 'lucide-react';
 import { pricesApi } from '../services/api';
+import { formatKRWSimple } from '../utils/format';
 
 interface ExpertPrediction {
   id: number;
@@ -387,12 +388,12 @@ export default function LivePredictions({ coin }: LivePredictionsProps) {
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="text-slate-400">진입가:</span>
-                          <span className="text-white font-semibold">${pred.entryPrice.toFixed(2)}</span>
+                          <span className="text-white font-semibold">{formatKRWSimple(pred.entryPrice)}</span>
                         </div>
                         <ArrowRight className="w-3 h-3 text-slate-500" />
                         <div className="flex items-center gap-2">
                           <span className="text-slate-400">현재가:</span>
-                          <span className="text-white font-semibold">${currentPriceValue.toFixed(2)}</span>
+                          <span className="text-white font-semibold">{formatKRWSimple(currentPriceValue)}</span>
                         </div>
                       </div>
 

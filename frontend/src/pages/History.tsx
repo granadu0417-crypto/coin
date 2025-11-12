@@ -1,47 +1,8 @@
 import { useState, useEffect } from 'react';
 import { arenaApi } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { formatToKST, formatKRW } from '../utils/format';
 import type { ClosedTrade } from '../types';
-
-// UTC 시간을 한국 시간(KST)으로 변환하는 유틸리티 함수
-const formatToKST = (utcTimeStr: string, format: 'full' | 'short' = 'full') => {
-  // UTC 시간 문자열에 'Z'를 추가하여 UTC임을 명시
-  const date = new Date(utcTimeStr.endsWith('Z') ? utcTimeStr : `${utcTimeStr}Z`);
-
-  if (format === 'short') {
-    return date.toLocaleDateString('ko-KR', {
-      timeZone: 'Asia/Seoul',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit'
-    });
-  }
-
-  return date.toLocaleString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
-
-// 원화 포맷팅 함수
-const formatKRW = (amount: number): string => {
-  const absAmount = Math.abs(amount);
-  const sign = amount >= 0 ? '+' : '-';
-
-  if (absAmount >= 100000000) {
-    // 1억 이상: "억" 단위
-    return `${sign}${(absAmount / 100000000).toFixed(2)}억원`;
-  } else if (absAmount >= 10000) {
-    // 1만 이상: "만" 단위
-    return `${sign}${(absAmount / 10000).toFixed(1)}만원`;
-  } else {
-    // 1만 미만: 그대로 표시
-    return `${sign}${absAmount.toLocaleString('ko-KR')}원`;
-  }
-};
 
 export default function History() {
   const [coin, setCoin] = useState<'btc' | 'eth'>('btc');

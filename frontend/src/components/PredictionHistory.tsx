@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Minus, Check, X, Filter, ChevronDown } from 'lucide-react';
+import { formatKRWSimple } from '../utils/format';
 
 interface HistoricalPrediction {
   id: number;
@@ -308,10 +309,10 @@ export default function PredictionHistory({ coin }: PredictionHistoryProps) {
                 <div className="text-center mx-4">
                   <p className="text-xs text-slate-400 mb-1">진입 → 청산</p>
                   <p className="text-sm font-mono">
-                    ${pred.entryPrice.toFixed(2)}
+                    {formatKRWSimple(pred.entryPrice)}
                   </p>
                   <p className="text-sm font-mono">
-                    → ${pred.exitPrice.toFixed(2)}
+                    → {formatKRWSimple(pred.exitPrice)}
                   </p>
                 </div>
 

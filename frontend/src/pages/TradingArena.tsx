@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { arenaApi } from '../services/api';
+import { upbitWebSocket, type UpbitTicker } from '../services/upbitWebSocket';
+import { formatKRWSimple, formatRelativeTime } from '../utils/format';
 import type { TraderBalance, OpenPosition, ClosedTrade } from '../types';
 
 export default function TradingArena() {
   const [selectedCoin, setSelectedCoin] = useState<'btc' | 'eth'>('btc');
+  const [realtimePrice, setRealtimePrice] = useState<{
+    btc: number | null;
+    eth: number | null;
+  }>({ btc: null, eth: null });
 
   // 리더보드 조회
   const { data: leaderboardData } = useQuery({
@@ -39,6 +45,30 @@ export default function TradingArena() {
   const recentTrades = (tradesData?.trades || []) as ClosedTrade[];
   const livePredictions = predictionsData?.predictions || [];
 
+  // 업비트 웹소켓으로 실시간 가격 받아오기
+  useEffect(() => {
+    const handleBtcTicker = (ticker: UpbitTicker) => {
+      setRealtimePrice((prev) => ({ ...prev, btc: ticker.trade_price }));
+    };
+
+    const handleEthTicker = (ticker: UpbitTicker) => {
+      setRealtimePrice((prev) => ({ ...prev, eth: ticker.trade_price }));
+    };
+
+    // BTC, ETH 구독
+    upbitWebSocket.subscribe('BTC', handleBtcTicker);
+    upbitWebSocket.subscribe('ETH', handleEthTicker);
+
+    // 컴포넌트 언마운트 시 구독 해제
+    return () => {
+      upbitWebSocket.unsubscribe('BTC', handleBtcTicker);
+      upbitWebSocket.unsubscribe('ETH', handleEthTicker);
+    };
+  }, []);
+
+  // 현재 선택된 코인의 실시간 가격
+  const currentPrice = realtimePrice[selectedCoin] ?? predictionsData?.currentPrice ?? 0;
+
   // 상위 3명
   const top3 = leaderboard.slice(0, 3);
 
@@ -52,19 +82,6 @@ export default function TradingArena() {
     if (status === 'active') return { text: '활성', color: 'bg-green-500/20 text-green-400 border-green-500/50' };
     if (status === 'paused') return { text: '일시정지', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' };
     return { text: '중단', color: 'bg-red-500/20 text-red-400 border-red-500/50' };
-  };
-
-  const formatTime = (timeStr: string) => {
-    // UTC 시간 문자열에 'Z'를 추가하여 UTC임을 명시
-    const time = new Date(timeStr.endsWith('Z') ? timeStr : `${timeStr}Z`);
-    const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - time.getTime()) / 60000);
-
-    if (diffMinutes < 1) return '방금 전';
-    if (diffMinutes < 60) return `${diffMinutes}분 전`;
-    const hours = Math.floor(diffMinutes / 60);
-    if (hours < 24) return `${hours}시간 전`;
-    return `${Math.floor(hours / 24)}일 전`;
   };
 
   return (
@@ -159,10 +176,12 @@ export default function TradingArena() {
               </div>
             )}
             <div className="mt-4 text-center text-xs text-slate-400">
-              {predictionsData?.currentPrice && (
-                <span>현재가: ₩{predictionsData.currentPrice.toLocaleString('ko-KR')} · </span>
+              {currentPrice > 0 && (
+                <span className="font-semibold text-green-400">
+                  실시간 현재가: {formatKRWSimple(currentPrice)} ·
+                </span>
               )}
-              <span>5초마다 자동 갱신</span>
+              <span>업비트 웹소켓 실시간 연결</span>
             </div>
           </div>
         </div>
@@ -193,7 +212,7 @@ export default function TradingArena() {
                   <div className={`text-3xl font-bold ${getProfitColor(trader.todayProfitPercent)}`}>
                     {trader.todayProfitPercent > 0 ? '+' : ''}{trader.todayProfitPercent.toFixed(1)}%
                   </div>
-                  <div className="text-sm text-slate-400 mt-1">${trader.currentBalance.toFixed(0)}</div>
+                  <div className="text-sm text-slate-400 mt-1">{formatKRWSimple(trader.currentBalance)}</div>
                   <div className="text-xs text-slate-500 mt-2">
                     오늘 {trader.todayWins}승 {trader.todayLosses}패
                   </div>
@@ -236,30 +255,30 @@ export default function TradingArena() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-slate-400">진입가</span>
-                      <span className="text-white font-mono">${pos.entryPrice.toFixed(2)}</span>
+                      <span className="text-white font-mono">{formatKRWSimple(pos.entryPrice)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">현재가</span>
-                      <span className="text-white font-mono">${(predictionsData?.currentPrice ?? 0).toFixed(2)}</span>
+                      <span className="text-white font-mono">{formatKRWSimple(currentPrice)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">실시간 수익률</span>
                       <span className={`font-bold ${
                         (() => {
                           const leverage = 20;
-                          const currentPrice = predictionsData?.currentPrice ?? pos.entryPrice;
+                          const price = currentPrice > 0 ? currentPrice : pos.entryPrice;
                           const profitPercent = pos.position === 'long'
-                            ? ((currentPrice - pos.entryPrice) / pos.entryPrice) * 100 * leverage
-                            : ((pos.entryPrice - currentPrice) / pos.entryPrice) * 100 * leverage;
+                            ? ((price - pos.entryPrice) / pos.entryPrice) * 100 * leverage
+                            : ((pos.entryPrice - price) / pos.entryPrice) * 100 * leverage;
                           return profitPercent >= 0 ? 'text-green-400' : 'text-red-400';
                         })()
                       }`}>
                         {(() => {
                           const leverage = 20;
-                          const currentPrice = predictionsData?.currentPrice ?? pos.entryPrice;
+                          const price = currentPrice > 0 ? currentPrice : pos.entryPrice;
                           const profitPercent = pos.position === 'long'
-                            ? ((currentPrice - pos.entryPrice) / pos.entryPrice) * 100 * leverage
-                            : ((pos.entryPrice - currentPrice) / pos.entryPrice) * 100 * leverage;
+                            ? ((price - pos.entryPrice) / pos.entryPrice) * 100 * leverage
+                            : ((pos.entryPrice - price) / pos.entryPrice) * 100 * leverage;
                           return `${profitPercent >= 0 ? '+' : ''}${profitPercent.toFixed(2)}%`;
                         })()}
                       </span>
@@ -270,7 +289,7 @@ export default function TradingArena() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">경과 시간</span>
-                      <span className="text-white">{formatTime(pos.entryTime)}</span>
+                      <span className="text-white">{formatRelativeTime(pos.entryTime)}</span>
                     </div>
                   </div>
                 </div>
@@ -316,7 +335,7 @@ export default function TradingArena() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <div className="text-white font-bold">${trader.currentBalance.toFixed(0)}</div>
+                          <div className="text-white font-bold">{formatKRWSimple(trader.currentBalance)}</div>
                           <div className={`text-xs ${getProfitColor(trader.totalProfitPercent)}`}>
                             {trader.totalProfitPercent > 0 ? '+' : ''}{trader.totalProfitPercent.toFixed(1)}%
                           </div>
@@ -326,7 +345,7 @@ export default function TradingArena() {
                             {trader.todayProfitPercent > 0 ? '+' : ''}{trader.todayProfitPercent.toFixed(1)}%
                           </div>
                           <div className={`text-xs ${getProfitColor(trader.todayProfitAmount)}`}>
-                            ${trader.todayProfitAmount > 0 ? '+' : ''}{trader.todayProfitAmount.toFixed(0)}
+                            {formatKRWSimple(trader.todayProfitAmount)}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -386,7 +405,7 @@ export default function TradingArena() {
                     <span className="text-2xl">{trade.expertEmoji}</span>
                     <div>
                       <div className="text-sm font-semibold text-white">{trade.expertName}</div>
-                      <div className="text-xs text-slate-400">{formatTime(trade.exitTime)}</div>
+                      <div className="text-xs text-slate-400">{formatRelativeTime(trade.exitTime)}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
