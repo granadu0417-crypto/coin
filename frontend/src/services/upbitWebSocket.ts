@@ -25,7 +25,7 @@ type TickerCallback = (ticker: UpbitTicker) => void;
 
 export class UpbitWebSocketService {
   private ws: WebSocket | null = null;
-  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectTimer: number | null = null;
   private callbacks: Map<string, Set<TickerCallback>> = new Map();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
